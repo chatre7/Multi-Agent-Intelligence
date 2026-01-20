@@ -1,0 +1,11 @@
+[
+  {
+    "timestamp": 1768925284.8435256,
+    "agent_name": "coder",
+    "model_name": "gpt-4",
+    "input_tokens": 100,
+    "output_tokens": 50,
+    "total_tokens": 150,
+    "estimated_cost": 0.045
+  }
+]

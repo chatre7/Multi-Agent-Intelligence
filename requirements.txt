@@ -1,0 +1,37 @@
+# Core Dependencies
+langchain==1.2.6
+langchain-core==1.2.7
+langchain-community==0.3.16
+langchain-ollama==1.0.1
+langchain-chroma==1.1.0
+langchain-text-splitters==0.3.5
+
+# Vector Storage & Memory
+chromadb==1.4.1
+
+# LLM Runtime
+ollama==0.6.1
+
+# Web Interface
+streamlit==1.41.1
+
+# Graph & State Management
+langgraph>=0.2.0
+
+# Observability & Metrics
+prometheus-client>=0.20.0
+langsmith>=0.1.0
+
+# Authentication & Security
+PyJWT>=2.0.0
+passlib[bcrypt]>=1.7.0
+
+# API Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# Development Dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+ruff>=0.1.0
+mypy>=1.8.0
