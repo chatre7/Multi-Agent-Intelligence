@@ -33,6 +33,9 @@ from agent_versioning import get_version_manager, TransitionAction
 from langgraph.graph import StateGraph as SubgraphStateGraph
 from typing import Literal
 
+# Dynamic Group Chat Support
+from enum import Enum
+
 
 # ==========================================
 # 1. MEMORY SYSTEM
@@ -353,8 +356,8 @@ planner_llm = llm
 
 def supervisor_node(state: AgentState):
     """
-    Hierarchical Supervisor: Makes high-level decisions and delegates to teams.
-    Instead of managing individual agents, now delegates to Planner or DevTeam.
+    Dynamic Supervisor: Uses intelligent routing to determine next speaker
+    Supports both hierarchical delegation and dynamic conversation flow
     """
     messages = state["messages"]
     last_message = messages[-1]
@@ -366,134 +369,41 @@ def supervisor_node(state: AgentState):
     if isinstance(last_message, ToolMessage):
         return {"next_agent": sender}
 
-    content = last_message.content.lower()
+    # 🚀 Dynamic Group Chat: Use intelligent router
+    router = get_next_speaker_router()
 
-    # 🚀 Hierarchical Decision Making:
-    # Instead of routing to individual agents, decide between:
-    # - Planner: For planning and analysis tasks
-    # - DevTeam: For development, coding, testing tasks
+    # Get conversation state for routing decisions
+    conversation_state = {
+        "hierarchical_mode": True,  # Enable hierarchical routing
+        "iteration_count": len(messages),
+        "participants": list(router.participant_roles.keys()),
+    }
 
-    # Handle DevTeam responses (simplified reporting)
+    # Determine next speaker based on current context
+    message_content = str(last_message.content)
+    next_speaker = router.get_next_speaker(sender, message_content, conversation_state)
+
+    # Check for termination conditions
+    if router.should_terminate(message_content, conversation_state["iteration_count"]):
+        print("  🎯 [Supervisor] : Conversation complete!")
+        return {"next_agent": "FINISH"}
+
+    print(f"  🎭 [Supervisor] : Dynamic routing -> {next_speaker}")
+
+    # Handle special routing logic
     if sender == "DevTeam":
-        dev_team_response = str(last_message.content).lower()
+        dev_team_response = message_content.lower()
         if any(
             word in dev_team_response
             for word in ["completed", "เสร็จ", "success", "done"]
         ):
-            print("  🏢 [Supervisor] : DevTeam reported completion -> Task finished!")
+            print("  🏢 [Supervisor] : DevTeam task completed successfully!")
             return {"next_agent": "FINISH"}
         elif any(word in dev_team_response for word in ["failed", "error", "ปัญหา"]):
-            print(
-                "  🏢 [Supervisor] : DevTeam reported issues -> Sending back for fixes"
-            )
-            return {"next_agent": "DevTeam"}  # Re-delegate to DevTeam
-        else:
-            # DevTeam still working, keep them going
-            return {"next_agent": "DevTeam"}
+            print("  🏢 [Supervisor] : DevTeam needs assistance -> routing to Planner")
+            return {"next_agent": "Planner"}  # Get help from Planner
 
-    # Initial user request analysis (Hierarchical approach)
-    if isinstance(last_message, HumanMessage):
-        # Complex planning tasks -> Planner
-        if any(
-            w in content
-            for w in [
-                "plan",
-                "design",
-                "architecture",
-                "strategy",
-                "analyze",
-                "วางแผน",
-                "ออกแบบ",
-                "วิเคราะห์",
-                "ระบบ",
-                "โครงสร้าง",
-            ]
-        ):
-            print("  🏢 [Supervisor] : Complex task detected -> Delegating to Planner")
-            return {"next_agent": "Planner"}
-
-        # Development/implementation tasks -> DevTeam
-        if any(
-            w in content
-            for w in [
-                "code",
-                "implement",
-                "create",
-                "build",
-                "develop",
-                "write",
-                "เขียน",
-                "สร้าง",
-                "พัฒนา",
-                "โค้ด",
-                "ฟีเจอร์",
-                "feature",
-            ]
-        ):
-            print(
-                "  🏢 [Supervisor] : Development task detected -> Delegating to DevTeam"
-            )
-            return {"next_agent": "DevTeam"}
-
-        # Testing/debugging tasks -> DevTeam
-        if any(
-            w in content
-            for w in [
-                "test",
-                "debug",
-                "fix",
-                "run",
-                "check",
-                "validate",
-                "ทดสอบ",
-                "แก้ไข",
-                "รัน",
-                "ตรวจสอบ",
-                "validate",
-            ]
-        ):
-            print("  🏢 [Supervisor] : Testing task detected -> Delegating to DevTeam")
-            return {"next_agent": "DevTeam"}
-
-    # AI-powered hierarchical routing for complex decisions
-    system_prompt = (
-        "You are the CEO Supervisor in a hierarchical organization.\n"
-        "Your role is to delegate high-level tasks to appropriate teams, not micromanage.\n\n"
-        "Decision Framework:\n"
-        "- STRATEGIC PLANNING (market analysis, architecture design) → Planner\n"
-        "- DEVELOPMENT WORK (coding, testing, debugging) → DevTeam\n"
-        "- COMPLEX ANALYSIS (requirements gathering, tech evaluation) → Planner\n"
-        "- IMPLEMENTATION (feature building, bug fixing) → DevTeam\n\n"
-        "Current Context: DevTeam handles coding/testing autonomously.\n"
-        "You receive summarized reports, not technical details.\n\n"
-        "Respond with JUST ONE WORD: Planner, DevTeam, or FINISH"
-    )
-
-    next_node = "FINISH"
-    try:
-        print("  🧠 [Supervisor] : กำลังคิด...")
-        response = supervisor_llm_text.invoke(
-            [SystemMessage(content=system_prompt)] + messages
-        )
-        content_resp = response.content.strip().lower()
-
-        if "plan" in content_resp:
-            next_node = "Planner"
-        elif "code" in content_resp:
-            next_node = "Coder"
-        elif "critic" in content_resp:
-            next_node = "Critic"
-        elif "test" in content_resp:
-            next_node = "Tester"
-        elif "finish" in content_resp:
-            next_node = "FINISH"
-        print(f"     ✅ ตัดสินใจ -> {next_node}")
-    except Exception as e:
-        next_node = "FINISH"
-
-    if next_node not in registry.get_members() and next_node != "FINISH":
-        next_node = "FINISH"
-    return {"next_agent": next_node}
+    return {"next_agent": next_speaker}
 
 
 def planner_node(state: AgentState):
@@ -524,29 +434,22 @@ def planner_node(state: AgentState):
         tasks_command = "/speckit.tasks"
         # This would generate the detailed task list
 
-        # Create hierarchical response - delegate to DevTeam
-        hierarchical_response = f"""
-🏗️ **Strategic Planning Complete - Delegating to DevTeam**
+        # Create dynamic response with clear next steps
+        dynamic_response = f"""
+🎯 **Strategic Analysis Complete**
 
-**Planning Summary:**
-- **Objective**: {user_request.strip()}
-- **Approach**: SpecKit-driven development with quality assurance
-- **Architecture**: Modular, scalable implementation
-- **Quality Gates**: Automated testing, code review, security validation
+**Current Assessment:**
+- **Request**: {user_request.strip()}
+- **Complexity**: High - requires structured development approach
+- **Next Phase**: Implementation with DevTeam collaboration
 
-**DevTeam Brief:**
-"Implement the planned feature following these specifications:
-1. Review detailed requirements in `.specify/specs/` directory
-2. Execute implementation according to technical plan
-3. Complete all acceptance criteria with 100% test coverage
-4. Report back only when fully complete and tested
+**Recommended Approach:**
+1. **DevTeam Implementation**: Coder → Critic → Tester iterative cycle
+2. **Quality Assurance**: Automated testing and code review
+3. **Completion Criteria**: All tests pass, code approved
 
-The DevTeam has full autonomy to iterate internally until completion."
-
-**Supervisor**: DevTeam will handle all development work autonomously.
-You will receive summarized status reports, not technical details.
-
-**Ready for DevTeam execution! 🚀**
+**Status**: Ready for development phase.
+**Next Speaker**: DevTeam should begin implementation.
 """
 
         response = SystemMessage(content=spec_driven_response)
@@ -971,36 +874,35 @@ def dev_team_coder_node(state: DevTeamState) -> DevTeamState:
 
     print("    📝 [DevTeam:Coder] กำลังพัฒนาโค้ด...")
 
-    # Enhanced prompt with task context
-    dev_team_prompt = f"""
-Role: Senior Developer in DevTeam.
-Task: Implement the required feature as part of the development team.
+    # Enhanced prompt with dynamic conversation context
+    dynamic_prompt = f"""
+Role: Senior Developer in collaborative development team.
 
-Task Summary: {task_summary}
+**Current Context:**
+- Task: {task_summary or "Implement requested feature"}
+- Team: Working with Critic and Tester for quality assurance
+- Process: Code → Review → Test → Iterate
 
-Guidelines:
-1. Focus on clean, maintainable code
-2. Follow existing project patterns and conventions
-3. Consider scalability and error handling
-4. Save code to appropriate files
-5. Prepare for review and testing
+**Implementation Guidelines:**
+1. Write clean, well-documented code following project standards
+2. Include proper error handling and edge cases
+3. Consider scalability and maintainability
+4. Save code to appropriate files with clear naming
+5. Provide implementation summary for team review
 
-After implementation, the code will be reviewed by Critic and tested by Tester.
-Provide a clear summary of what was implemented.
+**Collaboration Flow:**
+- After coding: Send to Critic for quality review
+- Address any issues found during review
+- Code will be tested by Tester before final approval
+
+**Communication Style:**
+Be clear about what was implemented and any assumptions made.
+If you encounter issues, explain them clearly for team resolution.
+
+Implementation ready - proceeding with development.
 """
 
-    # Use enhanced prompt if task context is available
-    if task_summary:
-        sys_msg = SystemMessage(content=dev_team_prompt)
-    else:
-        # Fallback to original approach
-        sys_msg = SystemMessage(
-            content="""
-    Role: Python Dev in DevTeam.
-    Task: Write code and SAVE it.
-    After saving, prepare summary for team review.
-    """
-        )
+    sys_msg = SystemMessage(content=dynamic_prompt)
 
     response = coder_llm.invoke([sys_msg] + messages)
     return {"messages": [response], "sender": "DevTeam_Coder", "dev_status": "coding"}
@@ -1012,21 +914,35 @@ def dev_team_critic_node(state: DevTeamState) -> DevTeamState:
 
     print("    🤔 [DevTeam:Critic] กำลังตรวจสอบโค้ด...")
 
-    dev_team_review_prompt = """
-Role: Senior Code Reviewer in DevTeam.
-Task: Review code implementation for quality, correctness, and adherence to standards.
+    dynamic_review_prompt = """
+Role: Senior Code Reviewer in collaborative development team.
 
-Focus Areas:
-1. Code correctness and logic
-2. Security vulnerabilities
-3. Performance considerations
-4. Code style and maintainability
-5. Testability
+**Review Context:**
+- Working with Coder and Tester for comprehensive quality assurance
+- Focus on constructive feedback and clear communication
+- Balance between quality standards and development velocity
 
-Output Rules:
-- If code meets standards: "APPROVED. Ready for testing."
-- If minor issues: "APPROVED with notes: [list issues]. Proceed to testing."
-- If major issues: "REJECTED. [Coder]: Please fix: [explain issues]"
+**Review Criteria:**
+1. **Code Correctness**: Logic, algorithms, edge cases
+2. **Security**: Vulnerabilities, input validation, data protection
+3. **Performance**: Efficiency, scalability considerations
+4. **Maintainability**: Code structure, documentation, readability
+5. **Testability**: How easily the code can be tested
+
+**Communication Guidelines:**
+- Be specific about issues found with code examples
+- Suggest concrete improvements, not just problems
+- Consider the development context and constraints
+- Balance perfection with pragmatism
+
+**Decision Framework:**
+- APPROVED: Code meets quality standards, ready for testing
+- APPROVED with notes: Minor issues that don't block testing
+- REJECTED: Major issues requiring fixes before testing
+
+**Next Steps:**
+After review, code goes to Tester for validation.
+Be prepared to discuss findings with the team.
 """
 
     sys_msg = SystemMessage(content=dev_team_review_prompt)
@@ -1045,21 +961,41 @@ def dev_team_tester_node(state: DevTeamState) -> DevTeamState:
 
     print("    🧪 [DevTeam:Tester] กำลังทดสอบโค้ด...")
 
-    dev_team_test_prompt = """
-Role: QA Engineer in DevTeam.
-Task: Test the implemented code for functionality, edge cases, and integration.
+    dynamic_test_prompt = """
+Role: QA Engineer in collaborative development team.
 
-Testing Focus:
-1. Functional correctness
-2. Error handling
-3. Integration with existing systems
-4. Performance validation
-5. Edge cases and boundary conditions
+**Testing Context:**
+- Final quality gate before implementation approval
+- Working with Coder and Critic to ensure robust solutions
+- Focus on user impact and system reliability
 
-Output Rules:
-- If all tests pass: "TESTS PASSED. Implementation ready."
-- If minor issues: "TESTS PASSED with notes: [list issues]. Implementation acceptable."
-- If major issues: "TESTS FAILED. [Coder]: Please fix: [explain issues]"
+**Testing Scope:**
+1. **Functional Testing**: Core features work as specified
+2. **Integration Testing**: Works with existing systems
+3. **Error Handling**: Graceful failure and recovery
+4. **Performance**: Reasonable response times and resource usage
+5. **Edge Cases**: Boundary conditions and unusual scenarios
+
+**Testing Approach:**
+- Automated tests where possible
+- Manual verification for complex scenarios
+- Regression testing to ensure no existing functionality broken
+- User experience validation
+
+**Communication Style:**
+- Clear pass/fail criteria with evidence
+- Specific about what was tested and how
+- Actionable feedback for any issues found
+- Context about impact and severity
+
+**Decision Framework:**
+- TESTS PASSED: Implementation meets requirements
+- TESTS PASSED with notes: Acceptable with minor issues
+- TESTS FAILED: Critical issues requiring fixes
+
+**Quality Assurance:**
+Final checkpoint before delivery to stakeholders.
+Ensure the solution is production-ready.
 """
 
     sys_msg = SystemMessage(content=dev_team_test_prompt)
@@ -1156,6 +1092,284 @@ def get_dev_team_subgraph():
 
 
 # ==========================================
+# 4.5 DYNAMIC GROUP CHAT / NEXT SPEAKER ROUTING
+# ==========================================
+
+
+class ConversationContext(Enum):
+    """Types of conversation contexts for routing decisions"""
+
+    PLANNING = "planning"
+    CODING = "coding"
+    REVIEWING = "reviewing"
+    TESTING = "testing"
+    DEBUGGING = "debugging"
+    COMPLETING = "completing"
+    CLARIFYING = "clarifying"
+    REPORTING = "reporting"
+
+
+class NextSpeakerRouter:
+    """Intelligent router that determines who should speak next based on conversation context"""
+
+    def __init__(self):
+        self.conversation_history = []
+        self.participant_roles = {
+            "supervisor": "CEO/Orchestrator - makes high-level decisions and delegates",
+            "Planner": "Strategic Planner - analyzes requirements and creates plans",
+            "DevTeam": "Development Team - implements, tests, and reviews code",
+            "Coder": "Individual Developer - writes and modifies code",
+            "Critic": "Code Reviewer - analyzes code quality and logic",
+            "Tester": "QA Engineer - runs tests and validates functionality",
+            "tools": "Tool Executor - runs scripts and external commands",
+        }
+
+    def analyze_message_context(self, message_content: str) -> ConversationContext:
+        """Analyze message content to determine conversation context"""
+        content_lower = message_content.lower()
+
+        # Completion indicators
+        if any(
+            word in content_lower
+            for word in [
+                "completed",
+                "finished",
+                "done",
+                "success",
+                "approved",
+                "passed",
+                "เสร็จ",
+            ]
+        ):
+            return ConversationContext.COMPLETING
+
+        # Testing context
+        if any(
+            word in content_lower
+            for word in ["test", "run", "validate", "check", "verify", "ทดสอบ", "รัน"]
+        ):
+            return ConversationContext.TESTING
+
+        # Code review context
+        if any(
+            word in content_lower
+            for word in [
+                "review",
+                "check",
+                "analyze",
+                "logic",
+                "quality",
+                "ตรวจสอบ",
+                "วิเคราะห์",
+            ]
+        ):
+            return ConversationContext.REVIEWING
+
+        # Coding context
+        if any(
+            word in content_lower
+            for word in [
+                "code",
+                "implement",
+                "write",
+                "create",
+                "function",
+                "class",
+                "เขียน",
+                "โค้ด",
+                "สร้าง",
+                "ฟังก์ชัน",
+            ]
+        ):
+            return ConversationContext.CODING
+
+        # Error/Debugging context
+        if any(
+            word in content_lower
+            for word in [
+                "error",
+                "bug",
+                "fix",
+                "debug",
+                "issue",
+                "problem",
+                "แก้ไข",
+                "debug",
+                "ปัญหา",
+                "error",
+            ]
+        ):
+            return ConversationContext.DEBUGGING
+
+        # Planning context
+        if any(
+            word in content_lower
+            for word in [
+                "plan",
+                "design",
+                "strategy",
+                "approach",
+                "how",
+                "what",
+                "วางแผน",
+                "ออกแบบ",
+                "วิธี",
+                "อะไร",
+            ]
+        ):
+            return ConversationContext.PLANNING
+
+        # Clarification needed
+        if any(
+            word in content_lower
+            for word in [
+                "clarify",
+                "explain",
+                "understand",
+                "clear",
+                "ไม่เข้าใจ",
+                "อธิบาย",
+            ]
+        ):
+            return ConversationContext.CLARIFYING
+
+        return ConversationContext.REPORTING
+
+    def get_next_speaker(
+        self, current_speaker: str, message_content: str, conversation_state: dict
+    ) -> str:
+        """
+        Determine who should speak next based on current context
+
+        Args:
+            current_speaker: Who just spoke
+            message_content: What was said
+            conversation_state: Current conversation state
+
+        Returns:
+            Next speaker name
+        """
+        context = self.analyze_message_context(message_content)
+
+        print(f"🎯 [Router] Context: {context.value}, Current: {current_speaker}")
+
+        # Context-based routing logic
+        if context == ConversationContext.COMPLETING:
+            # Task completed - route back to supervisor
+            if current_speaker in ["Coder", "Critic", "Tester"]:
+                return "supervisor"
+            return "supervisor"
+
+        elif context == ConversationContext.TESTING:
+            # Testing needed - route to Tester
+            if current_speaker != "Tester":
+                return "Tester"
+            # If Tester already speaking, might need to go back to Coder
+            return "Coder"
+
+        elif context == ConversationContext.REVIEWING:
+            # Code review needed - route to Critic
+            if current_speaker != "Critic":
+                return "Critic"
+            return "Coder"  # Review done, back to coding
+
+        elif context == ConversationContext.CODING:
+            # Coding work - route to Coder (or DevTeam in hierarchical mode)
+            if conversation_state.get("hierarchical_mode", False):
+                return "DevTeam"
+            else:
+                if current_speaker != "Coder":
+                    return "Coder"
+                return "Critic"  # Code written, send to review
+
+        elif context == ConversationContext.DEBUGGING:
+            # Errors found - route back to Coder for fixes
+            return "Coder"
+
+        elif context == ConversationContext.PLANNING:
+            # Planning needed - route to Planner
+            if current_speaker != "Planner":
+                return "Planner"
+            # Planning done, start implementation
+            if conversation_state.get("hierarchical_mode", False):
+                return "DevTeam"
+            else:
+                return "Coder"
+
+        elif context == ConversationContext.CLARIFYING:
+            # Need clarification - ask supervisor
+            return "supervisor"
+
+        # Default routing based on current speaker
+        routing_map = {
+            "supervisor": "Planner",  # Supervisor delegates to Planner
+            "Planner": "DevTeam"
+            if conversation_state.get("hierarchical_mode", False)
+            else "Coder",
+            "Coder": "Critic",  # Code → Review
+            "Critic": "Tester",  # Review → Test
+            "Tester": "supervisor",  # Test results → Supervisor
+            "DevTeam": "supervisor",  # DevTeam reports → Supervisor
+            "tools": current_speaker,  # Tool results go back to who called them
+        }
+
+        return routing_map.get(current_speaker, "supervisor")
+
+    def should_terminate(self, message_content: str, iteration_count: int) -> bool:
+        """Determine if conversation should terminate"""
+        content_lower = message_content.lower()
+
+        # Success termination
+        success_indicators = [
+            "task completed",
+            "implementation finished",
+            "all tests passed",
+            "approved",
+            "success",
+            "done",
+            "เสร็จสิ้น",
+            "สำเร็จ",
+        ]
+
+        # Failure termination (too many iterations)
+        if iteration_count > 15:
+            print("🔄 [Router] Max iterations reached, terminating")
+            return True
+
+        # Success termination
+        if any(indicator in content_lower for indicator in success_indicators):
+            print("✅ [Router] Success detected, terminating")
+            return True
+
+        return False
+
+
+# Global router instance
+_next_speaker_router = None
+
+
+def get_next_speaker_router() -> NextSpeakerRouter:
+    """Get or create the NextSpeakerRouter instance"""
+    global _next_speaker_router
+    if _next_speaker_router is None:
+        _next_speaker_router = NextSpeakerRouter()
+    return _next_speaker_router
+
+
+# Enhanced AgentState for dynamic conversations
+class DynamicAgentState(TypedDict):
+    """Enhanced state for dynamic group chat"""
+
+    messages: Annotated[Sequence[BaseMessage], operator.add]
+    sender: str
+    next_agent: str
+    conversation_context: ConversationContext
+    iteration_count: int
+    hierarchical_mode: bool
+    termination_reason: Optional[str]
+
+
+# ==========================================
 # 5. GRAPH BUILD
 # ==========================================
 db_path = "checkpoints.db"
@@ -1163,30 +1377,56 @@ conn = sqlite3.connect(db_path, check_same_thread=False)
 memory = SqliteSaver(conn)
 
 # Create hierarchical workflow with DevTeam subgraph
+# Dynamic Group Chat Graph with intelligent routing
 workflow = StateGraph(AgentState)
 workflow.add_node("supervisor", supervisor_node)
 workflow.add_node("Planner", planner_node)
-workflow.add_node(
-    "DevTeam", get_dev_team_subgraph()
-)  # 🚀 Hierarchical: DevTeam subgraph
+workflow.add_node("DevTeam", get_dev_team_subgraph())  # Hierarchical DevTeam
 workflow.add_node("tools", tool_node)
 
 workflow.set_entry_point("supervisor")
+
+
+# Dynamic routing function using NextSpeakerRouter
+def dynamic_route(state: AgentState) -> str:
+    """Dynamic routing based on conversation context"""
+    next_agent = state.get("next_agent", "supervisor")
+
+    # If termination requested, end the conversation
+    if next_agent == "FINISH":
+        return END
+
+    # Validate that the next agent exists in our graph
+    valid_agents = ["supervisor", "Planner", "DevTeam", "tools"]
+    if next_agent not in valid_agents:
+        print(f"⚠️ [Router] Invalid agent '{next_agent}', defaulting to supervisor")
+        return "supervisor"
+
+    return next_agent
+
+
+# Use conditional edges for dynamic routing
 workflow.add_conditional_edges(
     "supervisor",
-    lambda x: x["next_agent"],
+    dynamic_route,
     {
         "Planner": "Planner",
-        "DevTeam": "DevTeam",  # 🚀 Route to DevTeam subgraph instead of individual agents
+        "DevTeam": "DevTeam",
         "tools": "tools",
-        "FINISH": END,
+        END: END,  # Termination
     },
 )
 
-workflow.add_edge("Planner", "supervisor")
-workflow.add_edge(
-    "DevTeam", "supervisor"
-)  # 🚀 DevTeam subgraph reports back to supervisor
-workflow.add_edge("tools", "supervisor")
+
+# Dynamic return edges - agents can route back to supervisor or to other agents
+def dynamic_return_route(state: AgentState) -> str:
+    """Dynamic routing for returns to supervisor or other agents"""
+    next_agent = state.get("next_agent", "supervisor")
+    return next_agent if next_agent != "FINISH" else END
+
+
+workflow.add_conditional_edges("Planner", dynamic_return_route)
+workflow.add_conditional_edges("DevTeam", dynamic_return_route)
+workflow.add_conditional_edges("tools", dynamic_return_route)
 
 app = workflow.compile(checkpointer=memory, interrupt_before=["tools"])
