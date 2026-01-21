@@ -1763,8 +1763,10 @@ class DynamicAgentState(TypedDict):
 # ==========================================
 
 
-async def specialized_agent_node(state: AgentState, agent_name: str):
-    """Generic node for specialized agents"""
+def specialized_agent_node(state: AgentState, agent_name: str):
+    """Generic node for specialized agents (sync wrapper for async agent.process_task)"""
+    import asyncio
+
     messages = state["messages"]
     last_message = messages[-1]
 
@@ -1778,11 +1780,11 @@ async def specialized_agent_node(state: AgentState, agent_name: str):
     if not agent:
         error_msg = f"Specialized agent '{agent_name}' not found."
         print(f"  ❌ [{agent_name}] : {error_msg}")
-        return {"messages": [SystemMessage(content=error_msg)], "sender": agent_name}
+        return {"messages": [SystemMessage(content=error_msg)], "sender": agent_name, "next_agent": "supervisor"}
 
     try:
-        # Process the task using the specialized agent
-        result = await agent.process_task(task_content)
+        # Process the task using the specialized agent (run async method in sync context)
+        result = asyncio.run(agent.process_task(task_content))
 
         # Format response for the conversation
         if "error" in result:
@@ -1794,12 +1796,12 @@ async def specialized_agent_node(state: AgentState, agent_name: str):
             )
 
         response = SystemMessage(content=response_content)
-        return {"messages": [response], "sender": agent_name}
+        return {"messages": [response], "sender": agent_name, "next_agent": "supervisor"}
 
     except Exception as e:
         error_msg = f"❌ **{agent_name} Failed**: {str(e)}"
         print(f"  ❌ [{agent_name}] : {error_msg}")
-        return {"messages": [SystemMessage(content=error_msg)], "sender": agent_name}
+        return {"messages": [SystemMessage(content=error_msg)], "sender": agent_name, "next_agent": "supervisor"}
 
 
 async def multi_agent_orchestration_node(state: AgentState, strategy: str):
