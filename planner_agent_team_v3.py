@@ -559,13 +559,19 @@ def planner_node(state: AgentState):
     # For simple greetings, respond briefly and finish
     if is_simple_message and len(user_request.strip()) < 50:
         simple_response = SystemMessage(
-            content=f"""สวัสดีครับ! ผม Planner Agent พร้อมช่วยคุณวางแผนและพัฒนาโปรเจกต์
+            content=f"""สวัสดีครับ! ผม Planner Agent พร้อมช่วยคุณในงานต่างๆ
 
-คุณสามารถขอให้ผมช่วย:
-- วางแผนพัฒนา feature ใหม่
-- ออกแบบระบบและ architecture
-- สร้างแผนการทำงานแบบละเอียด
-- ประสานงานกับ DevTeam เพื่อ implement
+**งานพัฒนาซอฟต์แวร์:**
+- วางแผนและพัฒนา feature ใหม่ (DevTeam)
+- รีวิวโค้ด และหาจุดปรับปรุง (CodeReviewAgent)
+
+**งานวิเคราะห์และวิจัย:**
+- ค้นคว้าข้อมูลและเทคโนโลยี (ResearchAgent)
+- วิเคราะห์ข้อมูลและสถิติ (DataAnalysisAgent)
+
+**งานเอกสารและ DevOps:**
+- สร้างเอกสารและ API docs (DocumentationAgent)
+- จัดการ deployment และ infrastructure (DevOpsAgent)
 
 มีอะไรให้ช่วยไหมครับ?"""
         )
@@ -639,7 +645,34 @@ The DevTeam has access to web search tools for real-time information."
         )
         response = planner_llm.invoke([sys_msg] + messages)
 
-    return {"messages": [response], "sender": "Planner", "next_agent": "DevTeam"}
+    # Analyze request and determine appropriate next agent
+    request_lower = user_request.lower()
+
+    # Determine next agent based on request type
+    if any(word in request_lower for word in ["review", "รีวิว", "code review", "ตรวจสอบโค้ด", "quality"]):
+        next_agent = "CodeReviewAgent"
+        print("  🎯 [Planner] : Routing to CodeReviewAgent for code review")
+    elif any(word in request_lower for word in ["research", "ค้นคว้า", "หาข้อมูล", "search", "investigate"]):
+        next_agent = "ResearchAgent"
+        print("  🎯 [Planner] : Routing to ResearchAgent for research")
+    elif any(word in request_lower for word in ["analyze data", "วิเคราะห์ข้อมูล", "analytics", "statistics", "สถิติ"]):
+        next_agent = "DataAnalysisAgent"
+        print("  🎯 [Planner] : Routing to DataAnalysisAgent for data analysis")
+    elif any(word in request_lower for word in ["document", "เอกสาร", "docs", "api doc", "readme"]):
+        next_agent = "DocumentationAgent"
+        print("  🎯 [Planner] : Routing to DocumentationAgent for documentation")
+    elif any(word in request_lower for word in ["deploy", "devops", "infrastructure", "pipeline", "ci/cd"]):
+        next_agent = "DevOpsAgent"
+        print("  🎯 [Planner] : Routing to DevOpsAgent for DevOps tasks")
+    elif any(word in request_lower for word in ["implement", "develop", "code", "build", "create", "พัฒนา", "สร้าง"]):
+        next_agent = "DevTeam"
+        print("  🎯 [Planner] : Routing to DevTeam for implementation")
+    else:
+        # For ambiguous requests, route back to supervisor for intelligent routing
+        next_agent = "supervisor"
+        print("  🎯 [Planner] : Routing to supervisor for intelligent agent selection")
+
+    return {"messages": [response], "sender": "Planner", "next_agent": next_agent}
 
 
 def coder_node(state: AgentState):
