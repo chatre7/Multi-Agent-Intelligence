@@ -1,58 +1,21 @@
 """
 Web Search Cache System
 
-File-based cache with 24-hour TTL for search results to reduce API calls
-and improve performance while maintaining data freshness.
+Database-backed cache for web search results with TTL management
+for improved performance and reduced API costs.
 """
 
-import json
-import os
-from datetime import datetime
-from typing import Optional, Dict, Any
 import hashlib
+from typing import Optional, Dict, Any
+from database_manager import get_database_manager
 
 
 class SearchCache:
-    """File-based cache for web search results with 24-hour TTL"""
+    """Database-backed cache for web search results with TTL"""
 
-    def __init__(self, cache_file: str = "data/search_cache.json", ttl_hours: int = 24):
-        self.cache_file = cache_file
-        self.ttl_seconds = ttl_hours * 3600
-        self.cache: Dict[str, Dict] = {}
-
-        # Ensure cache directory exists
-        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-
-        # Load existing cache
-        self.load_cache()
-
-    def load_cache(self):
-        """Load cache from disk and clean expired entries"""
-        try:
-            if os.path.exists(self.cache_file):
-                with open(self.cache_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-
-                # Clean expired entries
-                current_time = datetime.utcnow().timestamp()
-                self.cache = {
-                    k: v
-                    for k, v in data.items()
-                    if current_time - v["timestamp"] < self.ttl_seconds
-                }
-            else:
-                self.cache = {}
-        except (json.JSONDecodeError, KeyError):
-            # Corrupted cache, start fresh
-            self.cache = {}
-
-    def save_cache(self):
-        """Save cache to disk"""
-        try:
-            with open(self.cache_file, "w", encoding="utf-8") as f:
-                json.dump(self.cache, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"Warning: Failed to save search cache: {e}")
+    def __init__(self, ttl_hours: int = 24):
+        self.ttl_hours = ttl_hours
+        self.db = get_database_manager()
 
     def get_cache_key(
         self, query: str, domain: Optional[str] = None, num_results: int = 5
@@ -66,57 +29,31 @@ class SearchCache:
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         """Get cached result if still valid"""
-        if key in self.cache:
-            entry = self.cache[key]
-            current_time = datetime.utcnow().timestamp()
+        cached = self.db.get_cached_search(key)
+        return cached["result"] if cached else None
 
-            if current_time - entry["timestamp"] < self.ttl_seconds:
-                return entry["result"]
-            else:
-                # Expired, remove from cache
-                del self.cache[key]
-                self.save_cache()
+    def set(
+        self,
+        key: str,
+        result: Dict[str, Any],
+        query: str = "",
+        domain: Optional[str] = None,
+        num_results: int = 5,
+    ):
+        """Cache search result"""
+        self.db.set_cached_search(key, query, domain, num_results, result)
 
-        return None
-
-    def set(self, key: str, result: Dict[str, Any]):
-        """Cache search result with timestamp"""
-        self.cache[key] = {"timestamp": datetime.utcnow().timestamp(), "result": result}
-        self.save_cache()
-
-    def clear_expired(self):
-        """Manually clear expired entries"""
-        current_time = datetime.utcnow().timestamp()
-        expired_keys = [
-            k
-            for k, v in self.cache.items()
-            if current_time - v["timestamp"] >= self.ttl_seconds
-        ]
-
-        for key in expired_keys:
-            del self.cache[key]
-
-        if expired_keys:
-            self.save_cache()
-            print(f"Cleared {len(expired_keys)} expired cache entries")
+    def clear_expired(self) -> int:
+        """Clear expired cache entries"""
+        return self.db.cleanup_expired_cache(self.ttl_hours)
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get cache statistics"""
-        total_entries = len(self.cache)
-        current_time = datetime.utcnow().timestamp()
-
-        valid_entries = sum(
-            1
-            for v in self.cache.values()
-            if current_time - v["timestamp"] < self.ttl_seconds
-        )
-
+        """Get cache statistics from database"""
+        db_stats = self.db.get_database_stats()
         return {
-            "total_entries": total_entries,
-            "valid_entries": valid_entries,
-            "expired_entries": total_entries - valid_entries,
-            "cache_file": self.cache_file,
-            "ttl_hours": self.ttl_seconds / 3600,
+            "cache_entries": db_stats.get("search_cache_count", 0),
+            "ttl_hours": self.ttl_hours,
+            "storage_type": "SQLite Database",
         }
 
 

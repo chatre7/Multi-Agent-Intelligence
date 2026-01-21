@@ -103,5 +103,110 @@
       "test_config": {},
       "prod_config": {}
     }
+  },
+  "CodeReviewAgent": {
+    "1.0.0": {
+      "agent_name": "CodeReviewAgent",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T04:29:11.463300",
+      "updated_at": "2026-01-21T04:29:11.463300",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "Advanced code review and security analysis specialist.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  },
+  "ResearchAgent": {
+    "1.0.0": {
+      "agent_name": "ResearchAgent",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T04:29:11.466381",
+      "updated_at": "2026-01-21T04:29:11.466381",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "Academic research and evidence-based analysis expert.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  },
+  "DataAnalysisAgent": {
+    "1.0.0": {
+      "agent_name": "DataAnalysisAgent",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T04:29:11.469619",
+      "updated_at": "2026-01-21T04:29:11.469619",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "Statistical analysis and data visualization specialist.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  },
+  "DocumentationAgent": {
+    "1.0.0": {
+      "agent_name": "DocumentationAgent",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T04:29:11.473744",
+      "updated_at": "2026-01-21T04:29:11.473744",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "Technical documentation and API writing expert.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  },
+  "DevOpsAgent": {
+    "1.0.0": {
+      "agent_name": "DevOpsAgent",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T04:29:11.476378",
+      "updated_at": "2026-01-21T04:29:11.476378",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "CI/CD pipeline and infrastructure deployment specialist.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
   }
 }

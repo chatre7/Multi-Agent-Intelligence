@@ -70,6 +70,26 @@ brain = MemoryManager()
 
 
 # ==========================================
+# ADVANCED AGENTS INTEGRATION
+# ==========================================
+
+# Import advanced specialized agents
+from advanced_agents import (
+    get_agent_registry as get_advanced_agent_registry,
+    get_multi_agent_orchestrator,
+    CodeReviewAgent,
+    ResearchAgent,
+    DataAnalysisAgent,
+    DocumentationAgent,
+    DevOpsAgent,
+)
+
+# Get advanced agent registry and orchestrator
+advanced_registry = get_advanced_agent_registry()
+multi_agent_orchestrator = get_multi_agent_orchestrator()
+
+
+# ==========================================
 # 2. AGENT REGISTRY WITH VERSIONING
 # ==========================================
 class AgentRegistry:
@@ -133,7 +153,7 @@ class AgentRegistry:
     def get_members(self) -> list:
         return list(self._agents.keys())
 
-    def list_agent_versions(self, name: str):
+    def get_agent_versions(self, name: str):
         """List all versions of an agent."""
         return self.version_manager.list_versions(name)
 
@@ -146,6 +166,23 @@ registry.register(
 )  # 🔥 เพิ่มคนนี้
 registry.register("Tester", "Runs scripts and validates output.")
 registry.register("Reviewer", "General reviewer (Final check).")
+
+# Register advanced specialized agents
+registry.register(
+    "CodeReviewAgent", "Advanced code review and security analysis specialist."
+)
+registry.register(
+    "ResearchAgent", "Academic research and evidence-based analysis expert."
+)
+registry.register(
+    "DataAnalysisAgent", "Statistical analysis and data visualization specialist."
+)
+registry.register(
+    "DocumentationAgent", "Technical documentation and API writing expert."
+)
+registry.register(
+    "DevOpsAgent", "CI/CD pipeline and infrastructure deployment specialist."
+)
 
 # ==========================================
 # 3. CONFIG & TOOLS
@@ -356,8 +393,8 @@ planner_llm = llm
 
 def supervisor_node(state: AgentState):
     """
-    Dynamic Supervisor: Uses intelligent routing to determine next speaker
-    Supports both hierarchical delegation and dynamic conversation flow
+    Advanced Dynamic Supervisor: Uses intelligent routing with specialized agents
+    Supports hierarchical delegation, dynamic conversation flow, and specialized agent selection
     """
     messages = state["messages"]
     last_message = messages[-1]
@@ -390,7 +427,7 @@ def supervisor_node(state: AgentState):
 
     print(f"  🎭 [Supervisor] : Dynamic routing -> {next_speaker}")
 
-    # Handle special routing logic
+    # Handle special routing logic for specialized agents and DevTeam
     if sender == "DevTeam":
         dev_team_response = message_content.lower()
         if any(
@@ -402,6 +439,43 @@ def supervisor_node(state: AgentState):
         elif any(word in dev_team_response for word in ["failed", "error", "ปัญหา"]):
             print("  🏢 [Supervisor] : DevTeam needs assistance -> routing to Planner")
             return {"next_agent": "Planner"}  # Get help from Planner
+
+    # Handle specialized agent responses - they should route back appropriately
+    specialized_agents = [
+        "CodeReviewAgent",
+        "ResearchAgent",
+        "DataAnalysisAgent",
+        "DocumentationAgent",
+        "DevOpsAgent",
+    ]
+
+    if sender in specialized_agents:
+        # Specialized agents have completed their analysis, route back to supervisor
+        # or continue with appropriate next steps based on the analysis
+        agent_response = message_content.lower()
+        if any(word in agent_response for word in ["error", "failed", "unable"]):
+            print(
+                f"  🔬 [Supervisor] : {sender} encountered issues, routing to Planner for assistance"
+            )
+            return {"next_agent": "Planner"}
+        else:
+            print(
+                f"  🔬 [Supervisor] : {sender} analysis complete, task ready for next steps"
+            )
+            # Could route to DevTeam for implementation or keep with supervisor for user decision
+
+    # Handle multi-agent orchestration responses
+    if sender.startswith("MultiAgent_"):
+        orchestration_response = message_content.lower()
+        if any(word in orchestration_response for word in ["error", "failed"]):
+            print(
+                f"  🎭 [Supervisor] : Multi-agent orchestration failed, routing to Planner"
+            )
+            return {"next_agent": "Planner"}
+        else:
+            print(
+                f"  🎭 [Supervisor] : Multi-agent orchestration complete, ready for next steps"
+            )
 
     return {"next_agent": next_speaker}
 
@@ -1383,6 +1457,172 @@ def get_next_speaker_router() -> NextSpeakerRouter:
     return _next_speaker_router
 
 
+# ==========================================
+# ADVANCED AGENT SELECTION LOGIC
+# ==========================================
+
+
+def _select_specialized_agent(
+    message_content: str, current_sender: str
+) -> Optional[str]:
+    """
+    Analyze message content to determine if a specialized agent should handle the task.
+
+    Returns the name of the most appropriate specialized agent, or None if no specialized
+    agent is needed.
+    """
+    content_lower = message_content.lower()
+
+    # Skip specialized routing if already in specialized agent workflow
+    specialized_agents = [
+        "CodeReviewAgent",
+        "ResearchAgent",
+        "DataAnalysisAgent",
+        "DocumentationAgent",
+        "DevOpsAgent",
+    ]
+    if current_sender in specialized_agents:
+        return None
+
+    # Code Review Agent - Security and code quality analysis
+    code_review_keywords = [
+        "security",
+        "vulnerability",
+        "audit",
+        "review code",
+        "code quality",
+        "static analysis",
+        "security scan",
+        "penetration test",
+        "bug bounty",
+        "secure coding",
+        "owasp",
+        "cve",
+        "exploit",
+        "injection",
+        "xss",
+        "csrf",
+        "authentication",
+        "authorization",
+        "encryption",
+    ]
+    if any(keyword in content_lower for keyword in code_review_keywords):
+        return "CodeReviewAgent"
+
+    # Research Agent - Academic research and evidence-based analysis
+    research_keywords = [
+        "research",
+        "study",
+        "evidence",
+        "academic",
+        "literature",
+        "meta-analysis",
+        "systematic review",
+        "peer review",
+        "methodology",
+        "hypothesis",
+        "statistical significance",
+        "confidence interval",
+        "p-value",
+        "randomized controlled trial",
+        "case study",
+        "evidence-based",
+    ]
+    if any(keyword in content_lower for keyword in research_keywords):
+        return "ResearchAgent"
+
+    # Data Analysis Agent - Statistics and visualization
+    data_keywords = [
+        "statistics",
+        "data analysis",
+        "visualization",
+        "chart",
+        "graph",
+        "correlation",
+        "regression",
+        "anova",
+        "hypothesis test",
+        "confidence",
+        "trend analysis",
+        "forecasting",
+        "time series",
+        "clustering",
+        "classification",
+        "machine learning",
+        "predictive model",
+    ]
+    if any(keyword in content_lower for keyword in data_keywords):
+        return "DataAnalysisAgent"
+
+    # Documentation Agent - Technical writing and API docs
+    docs_keywords = [
+        "documentation",
+        "api docs",
+        "readme",
+        "user guide",
+        "technical writing",
+        "swagger",
+        "openapi",
+        "javadoc",
+        "docstring",
+        "api reference",
+        "tutorial",
+        "getting started",
+        "how-to",
+        "documentation maintenance",
+    ]
+    if any(keyword in content_lower for keyword in docs_keywords):
+        return "DocumentationAgent"
+
+    # DevOps Agent - Infrastructure and deployment
+    devops_keywords = [
+        "deployment",
+        "ci/cd",
+        "pipeline",
+        "infrastructure",
+        "docker",
+        "kubernetes",
+        "terraform",
+        "ansible",
+        "jenkins",
+        "github actions",
+        "monitoring",
+        "logging",
+        "scaling",
+        "load balancer",
+        "microservices",
+        "serverless",
+        "cloud architecture",
+        "devops",
+        "infrastructure as code",
+    ]
+    if any(keyword in content_lower for keyword in devops_keywords):
+        return "DevOpsAgent"
+
+    # Multi-agent orchestration triggers
+    orchestration_keywords = [
+        "orchestrate:",
+        "multi-agent",
+        "parallel processing",
+        "consensus",
+        "sequential workflow",
+        "agent team",
+        "collaborative analysis",
+    ]
+    if any(keyword in content_lower for keyword in orchestration_keywords):
+        # Extract orchestration strategy if specified
+        if "orchestrate:sequential" in content_lower:
+            return "MultiAgentSequential"
+        elif "orchestrate:parallel" in content_lower:
+            return "MultiAgentParallel"
+        elif "orchestrate:consensus" in content_lower:
+            return "MultiAgentConsensus"
+        else:
+            return "MultiAgentAuto"
+
+    return None
+
+
 # Enhanced AgentState for dynamic conversations
 class DynamicAgentState(TypedDict):
     """Enhanced state for dynamic group chat"""
@@ -1397,13 +1637,133 @@ class DynamicAgentState(TypedDict):
 
 
 # ==========================================
+# SPECIALIZED AGENT NODES
+# ==========================================
+
+
+async def specialized_agent_node(state: AgentState, agent_name: str):
+    """Generic node for specialized agents"""
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    print(f"  🔬 [{agent_name}] : Processing specialized task...")
+
+    # Get the task from the last message
+    task_content = str(last_message.content)
+
+    # Get the specialized agent
+    agent = advanced_registry.get_agent(agent_name)
+    if not agent:
+        error_msg = f"Specialized agent '{agent_name}' not found."
+        print(f"  ❌ [{agent_name}] : {error_msg}")
+        return {"messages": [SystemMessage(content=error_msg)], "sender": agent_name}
+
+    try:
+        # Process the task using the specialized agent
+        result = await agent.process_task(task_content)
+
+        # Format response for the conversation
+        if "error" in result:
+            response_content = f"❌ **{agent_name} Error**: {result['error']}\n\n**Suggestions**: {', '.join(result.get('fallback_suggestions', []))}"
+        else:
+            response_content = (
+                f"🔬 **{agent_name} Analysis Complete**\n\n**Response**: {result['response']}\n\n**Confidence**: {result['confidence']:.2f}\n\n**Key Recommendations**:\n"
+                + "\n".join(f"- {rec}" for rec in result.get("recommendations", [])[:3])
+            )
+
+        response = SystemMessage(content=response_content)
+        return {"messages": [response], "sender": agent_name}
+
+    except Exception as e:
+        error_msg = f"❌ **{agent_name} Failed**: {str(e)}"
+        print(f"  ❌ [{agent_name}] : {error_msg}")
+        return {"messages": [SystemMessage(content=error_msg)], "sender": agent_name}
+
+
+async def multi_agent_orchestration_node(state: AgentState, strategy: str):
+    """Node for multi-agent orchestration"""
+    messages = state["messages"]
+    last_message = messages[-1]
+
+    print(f"  🎭 [MultiAgent_{strategy}] : Orchestrating with {strategy} strategy...")
+
+    # Get the task from the last message
+    task_content = str(last_message.content)
+
+    try:
+        # Orchestrate the task
+        result = await multi_agent_orchestrator.orchestrate_task(task_content, strategy)
+
+        # Format the orchestration result
+        if "error" in result:
+            response_content = (
+                f"❌ **Multi-Agent Orchestration Failed**: {result['error']}"
+            )
+        else:
+            response_content = (
+                f"🎭 **Multi-Agent Orchestration Complete ({strategy})**\n\n"
+            )
+
+            if strategy == "parallel":
+                synthesis = result.get("synthesis", {})
+                response_content += f"**Strategy**: Parallel processing across {len(result.get('agents_used', []))} agents\n"
+                response_content += (
+                    f"**Key Insights**:\n"
+                    + "\n".join(
+                        f"- {insight}"
+                        for insight in synthesis.get("key_insights", [])[:3]
+                    )
+                    + "\n\n"
+                )
+                response_content += (
+                    f"**Consolidated Recommendations**:\n"
+                    + "\n".join(
+                        f"- {rec}"
+                        for rec in synthesis.get("consolidated_recommendations", [])[:3]
+                    )
+                    + "\n\n"
+                )
+                response_content += f"**Average Confidence**: {synthesis.get('average_confidence', 0):.2f}"
+
+            elif strategy == "sequential":
+                response_content += f"**Strategy**: Sequential processing through {len(result.get('agent_sequence', []))} agents\n"
+                final_result = result.get("final_result", {})
+                if "response" in final_result:
+                    response_content += (
+                        f"**Final Result**: {final_result['response'][:500]}..."
+                    )
+
+            elif strategy == "consensus":
+                consensus = result.get("consensus", {})
+                response_content += f"**Strategy**: Consensus from {consensus.get('agents_agreed', 0)} agents\n"
+                response_content += f"**Top Recommendation**: {consensus.get('top_recommendation', 'N/A')}\n"
+                response_content += (
+                    f"**Consensus Level**: {consensus.get('consensus_level', 0):.2f}\n"
+                )
+                response_content += (
+                    f"**Confidence Score**: {consensus.get('confidence_score', 0):.2f}"
+                )
+
+        response = SystemMessage(content=response_content)
+        return {"messages": [response], "sender": f"MultiAgent_{strategy}"}
+
+    except Exception as e:
+        error_msg = f"❌ **Multi-Agent Orchestration Failed**: {str(e)}"
+        print(f"  ❌ [MultiAgent_{strategy}] : {error_msg}")
+        return {
+            "messages": [SystemMessage(content=error_msg)],
+            "sender": f"MultiAgent_{strategy}",
+        }
+
+
+# ==========================================
 # 5. GRAPH BUILD
 # ==========================================
 db_path = "checkpoints.db"
 conn = sqlite3.connect(db_path, check_same_thread=False)
 memory = SqliteSaver(conn)
 
-# Create hierarchical workflow with DevTeam subgraph
+# Create hierarchical workflow with DevTeam subgraph and specialized agents
 # Dynamic Group Chat Graph with intelligent routing
 workflow = StateGraph(AgentState)
 workflow.add_node("supervisor", supervisor_node)
@@ -1411,20 +1771,71 @@ workflow.add_node("Planner", planner_node)
 workflow.add_node("DevTeam", get_dev_team_subgraph())  # Hierarchical DevTeam
 workflow.add_node("tools", tool_node)
 
+# Add specialized agent nodes
+workflow.add_node(
+    "CodeReviewAgent", lambda state: specialized_agent_node(state, "CodeReviewAgent")
+)
+workflow.add_node(
+    "ResearchAgent", lambda state: specialized_agent_node(state, "ResearchAgent")
+)
+workflow.add_node(
+    "DataAnalysisAgent",
+    lambda state: specialized_agent_node(state, "DataAnalysisAgent"),
+)
+workflow.add_node(
+    "DocumentationAgent",
+    lambda state: specialized_agent_node(state, "DocumentationAgent"),
+)
+workflow.add_node(
+    "DevOpsAgent", lambda state: specialized_agent_node(state, "DevOpsAgent")
+)
+
+# Add multi-agent orchestration nodes
+workflow.add_node(
+    "MultiAgent_sequential",
+    lambda state: multi_agent_orchestration_node(state, "sequential"),
+)
+workflow.add_node(
+    "MultiAgent_parallel",
+    lambda state: multi_agent_orchestration_node(state, "parallel"),
+)
+workflow.add_node(
+    "MultiAgent_consensus",
+    lambda state: multi_agent_orchestration_node(state, "consensus"),
+)
+workflow.add_node(
+    "MultiAgent_auto", lambda state: multi_agent_orchestration_node(state, "auto")
+)
+
 workflow.set_entry_point("supervisor")
 
 
-# Dynamic routing function using NextSpeakerRouter
-def dynamic_route(state: AgentState) -> str:
-    """Dynamic routing based on conversation context"""
+# Advanced dynamic routing function
+def advanced_dynamic_route(state: AgentState) -> str:
+    """Advanced dynamic routing with specialized agents"""
     next_agent = state.get("next_agent", "supervisor")
 
     # If termination requested, end the conversation
     if next_agent == "FINISH":
         return END
 
-    # Validate that the next agent exists in our graph
-    valid_agents = ["supervisor", "Planner", "DevTeam", "tools"]
+    # Define all valid agents including specialized ones
+    valid_agents = [
+        "supervisor",
+        "Planner",
+        "DevTeam",
+        "tools",
+        "CodeReviewAgent",
+        "ResearchAgent",
+        "DataAnalysisAgent",
+        "DocumentationAgent",
+        "DevOpsAgent",
+        "MultiAgent_sequential",
+        "MultiAgent_parallel",
+        "MultiAgent_consensus",
+        "MultiAgent_auto",
+    ]
+
     if next_agent not in valid_agents:
         print(f"⚠️ [Router] Invalid agent '{next_agent}', defaulting to supervisor")
         return "supervisor"
@@ -1432,14 +1843,23 @@ def dynamic_route(state: AgentState) -> str:
     return next_agent
 
 
-# Use conditional edges for dynamic routing
+# Use conditional edges for advanced dynamic routing
 workflow.add_conditional_edges(
     "supervisor",
-    dynamic_route,
+    advanced_dynamic_route,
     {
         "Planner": "Planner",
         "DevTeam": "DevTeam",
         "tools": "tools",
+        "CodeReviewAgent": "CodeReviewAgent",
+        "ResearchAgent": "ResearchAgent",
+        "DataAnalysisAgent": "DataAnalysisAgent",
+        "DocumentationAgent": "DocumentationAgent",
+        "DevOpsAgent": "DevOpsAgent",
+        "MultiAgent_sequential": "MultiAgent_sequential",
+        "MultiAgent_parallel": "MultiAgent_parallel",
+        "MultiAgent_consensus": "MultiAgent_consensus",
+        "MultiAgent_auto": "MultiAgent_auto",
         END: END,  # Termination
     },
 )
@@ -1452,8 +1872,18 @@ def dynamic_return_route(state: AgentState) -> str:
     return next_agent if next_agent != "FINISH" else END
 
 
+# Add return edges for all nodes
 workflow.add_conditional_edges("Planner", dynamic_return_route)
 workflow.add_conditional_edges("DevTeam", dynamic_return_route)
 workflow.add_conditional_edges("tools", dynamic_return_route)
+workflow.add_conditional_edges("CodeReviewAgent", dynamic_return_route)
+workflow.add_conditional_edges("ResearchAgent", dynamic_return_route)
+workflow.add_conditional_edges("DataAnalysisAgent", dynamic_return_route)
+workflow.add_conditional_edges("DocumentationAgent", dynamic_return_route)
+workflow.add_conditional_edges("DevOpsAgent", dynamic_return_route)
+workflow.add_conditional_edges("MultiAgent_sequential", dynamic_return_route)
+workflow.add_conditional_edges("MultiAgent_parallel", dynamic_return_route)
+workflow.add_conditional_edges("MultiAgent_consensus", dynamic_return_route)
+workflow.add_conditional_edges("MultiAgent_auto", dynamic_return_route)
 
 app = workflow.compile(checkpointer=memory, interrupt_before=["tools"])

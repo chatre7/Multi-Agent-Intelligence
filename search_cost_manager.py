@@ -2,84 +2,42 @@
 Search Cost Manager
 
 Manages search API costs, budget limits, and usage tracking
-with notifications when approaching limits.
+with database persistence and notifications when approaching limits.
 """
 
-import json
-import os
-from datetime import datetime
 from typing import Dict, Any, Optional
 import logging
 
 from search_config import SEARCH_CONFIG
+from database_manager import get_database_manager
 
 logger = logging.getLogger(__name__)
 
 
 class SearchCostManager:
-    """Manages search API costs and budget enforcement"""
+    """Manages search API costs and budget enforcement with database persistence"""
 
-    def __init__(self, budget_file: str = "data/search_budget.json"):
-        self.budget_file = budget_file
-        self.daily_budget = SEARCH_CONFIG["daily_budget"]
-        self.usage_today = 0.0
-        self.last_reset_date = None
+    def __init__(self):
+        self.db = get_database_manager()
+        self.daily_budget = float(SEARCH_CONFIG["daily_budget"])
+        self._load_budget_data()
 
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(budget_file), exist_ok=True)
-
-        # Load existing budget data
-        self.load_budget_data()
-
-    def load_budget_data(self):
-        """Load budget and usage data from disk"""
-        try:
-            if os.path.exists(self.budget_file):
-                with open(self.budget_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self.usage_today = data.get("usage_today", 0.0)
-                    self.last_reset_date = data.get("last_reset_date")
-            else:
-                self.reset_daily_budget()
-        except (json.JSONDecodeError, KeyError):
-            # Corrupted data, reset
-            self.reset_daily_budget()
-
-    def save_budget_data(self):
-        """Save budget and usage data to disk"""
-        try:
-            data = {
-                "usage_today": self.usage_today,
-                "last_reset_date": self.last_reset_date,
-                "daily_budget": self.daily_budget,
-            }
-            with open(self.budget_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.error(f"Failed to save budget data: {e}")
-
-    def reset_daily_budget(self):
-        """Reset daily usage counters"""
-        self.usage_today = 0.0
-        self.last_reset_date = datetime.utcnow().date().isoformat()
-        self.save_budget_data()
-        logger.info(f"🔄 Daily search budget reset: $0/${self.daily_budget}")
-
-    def check_daily_reset(self):
-        """Check if we need to reset daily counters"""
-        today = datetime.utcnow().date().isoformat()
-
-        if self.last_reset_date != today:
-            self.reset_daily_budget()
+    def _load_budget_data(self):
+        """Load budget data from database"""
+        # Get today's usage from database
+        cost_stats = self.db.get_search_cost_stats(days=1)
+        today_usage = sum(stat.get("total_cost", 0) for stat in cost_stats)
+        self.usage_today = today_usage
 
     def check_budget(self) -> bool:
         """Check if we're within daily budget"""
-        self.check_daily_reset()
+        # Always reload budget data to ensure accuracy
+        self._load_budget_data()
         return self.usage_today < self.daily_budget
 
     def get_budget_status(self) -> Dict[str, Any]:
         """Get current budget status"""
-        self.check_daily_reset()
+        self._load_budget_data()
 
         usage_percent = (
             (self.usage_today / self.daily_budget) * 100 if self.daily_budget > 0 else 0
@@ -93,15 +51,25 @@ class SearchCostManager:
             "within_budget": self.usage_today < self.daily_budget,
         }
 
-    def track_cost(self, query: str, provider: str, result_count: int):
-        """Track search API cost"""
-        self.check_daily_reset()
-
+    def track_cost(
+        self,
+        query: str,
+        provider: str,
+        result_count: int,
+        user_id: Optional[str] = None,
+        user_role: Optional[str] = None,
+    ) -> float:
+        """Track search API cost in database"""
         cost_per_query = SEARCH_CONFIG["cost_per_query"]
         total_cost = cost_per_query * result_count
 
+        # Record in database
+        self.db.record_search_cost(
+            query, provider, result_count, total_cost, user_id, user_role
+        )
+
+        # Update local cache
         self.usage_today += total_cost
-        self.save_budget_data()
 
         # Log the transaction
         logger.info(
@@ -156,10 +124,18 @@ class SearchCostManager:
                 f"❌ Budget exceeded: Daily limit of ${self.daily_budget} reached",
             )
 
-        # Check individual user limits (if implemented)
-        # For now, rely on role-based limits
-
         return True, "✅ Search permitted"
+
+    def get_cost_analytics(self, days: int = 7) -> Dict[str, Any]:
+        """Get comprehensive cost analytics"""
+        return {
+            "budget_status": self.get_budget_status(),
+            "cost_history": self.db.get_search_cost_stats(days),
+            "total_cost_period": sum(
+                stat.get("total_cost", 0)
+                for stat in self.db.get_search_cost_stats(days)
+            ),
+        }
 
 
 # Global cost manager instance
