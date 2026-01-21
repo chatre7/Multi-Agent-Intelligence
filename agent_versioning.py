@@ -5,8 +5,7 @@ Provides version tracking, environment transitions, and production sealing.
 """
 
 import json
-import os
-from typing import Dict, List, Optional, Any, Literal, NamedTuple
+from typing import Dict, List, Optional, Any, NamedTuple
 from datetime import datetime
 from dataclasses import dataclass, asdict
 from enum import Enum

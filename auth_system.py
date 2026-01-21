@@ -4,13 +4,11 @@ Implements RBAC (Role-Based Access Control) following Microsoft's security guide
 Provides JWT-based authentication, role management, and permission checking.
 """
 
-import os
 import json
 import time
-import hashlib
 import secrets
 from pathlib import Path
-from typing import Dict, List, Set, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from enum import Enum

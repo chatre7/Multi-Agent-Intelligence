@@ -47,7 +47,6 @@ class TestTokenRecord:
 
     def test_token_record_to_dict(self):
         """Test converting TokenRecord to dictionary."""
-        from dataclasses import asdict
 
         record = TokenRecord(
             timestamp=time.time(),

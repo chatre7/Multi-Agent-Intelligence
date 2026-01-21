@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from auth_middleware import (
     AuthMiddleware,
     get_current_user,
+    get_admin_user,
     get_monitor_user,
     create_user,
     authenticate_user,

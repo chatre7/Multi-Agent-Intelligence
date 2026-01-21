@@ -4,7 +4,6 @@ Provides JWT authentication middleware and permission-based dependencies
 for securing FastAPI endpoints.
 """
 
-import os
 from typing import Optional, List
 from fastapi import Request, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -196,7 +195,6 @@ def authenticate_user(username: str, password: str) -> User:
 if __name__ == "__main__":
     # Demo FastAPI integration
     from fastapi import FastAPI
-    from fastapi.responses import JSONResponse
 
     app = FastAPI(title="Multi-Agent Auth Demo")
 

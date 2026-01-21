@@ -1,7 +1,6 @@
 """Unit tests for Authentication Middleware."""
 
 import pytest
-from unittest.mock import Mock
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from auth_middleware import (
@@ -106,7 +105,7 @@ class TestFastAPIIntegration:
     def test_app(self):
         """Create test FastAPI app with auth."""
         from fastapi import FastAPI
-        from auth_middleware import AuthMiddleware, get_current_user, get_admin_user
+        from auth_middleware import AuthMiddleware
 
         app = FastAPI()
 

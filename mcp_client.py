@@ -5,10 +5,8 @@ through the MCP server following Microsoft's MCP architecture.
 """
 
 import asyncio
-import json
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from datetime import datetime
 
 from mcp_server import MCPServer, ToolResult, ToolStatus, get_mcp_server
 

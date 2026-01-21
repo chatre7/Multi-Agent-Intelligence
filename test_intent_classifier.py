@@ -1,11 +1,9 @@
 """Unit tests for Intent Classifier."""
 
-import pytest
 from intent_classifier import (
     IntentClassifier,
     IntentClassifierConfig,
     get_classifier,
-    UserIntent,
 )
 
 
@@ -67,7 +65,6 @@ class TestIntentClassifier:
 
     def test_parse_response_json_format(self):
         """Test parsing JSON response."""
-        import json
 
         test_response = """
         ```json

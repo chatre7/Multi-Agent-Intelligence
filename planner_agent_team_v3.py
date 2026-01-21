@@ -2,17 +2,13 @@ import operator
 import subprocess
 import os
 import sqlite3
-import json
-import re
-from typing import Annotated, Sequence, TypedDict, Literal, Dict
+from typing import Annotated, Sequence, TypedDict, Dict
 
 # Memory Dependencies
-import chromadb
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.documents import Document
 
-from pydantic import BaseModel, Field
 from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
@@ -31,7 +27,7 @@ from mcp_server import get_mcp_server
 from mcp_client import get_mcp_client
 
 # Agent Versioning
-from agent_versioning import get_version_manager, AgentState, TransitionAction
+from agent_versioning import get_version_manager, TransitionAction
 
 
 # ==========================================
@@ -41,7 +37,7 @@ class MemoryManager:
     def __init__(self):
         try:
             self.embeddings = OllamaEmbeddings(model="nomic-embed-text")
-        except:
+        except Exception as e:
             print("⚠️ Warning: 'nomic-embed-text' not found. Using default.")
             self.embeddings = OllamaEmbeddings(model="gpt-oss:120b-cloud")
 
@@ -54,7 +50,7 @@ class MemoryManager:
     def save(self, text: str, source: str = "User"):
         doc = Document(page_content=text, metadata={"source": source})
         self.vector_store.add_documents([doc])
-        return f"✅ Saved to memory."
+        return "✅ Saved to memory."
 
     def search(self, query: str, k: int = 2):
         results = self.vector_store.similarity_search(query, k=k)
@@ -402,7 +398,7 @@ def supervisor_node(state: AgentState):
 
     next_node = "FINISH"
     try:
-        print(f"  🧠 [Supervisor] : กำลังคิด...")
+        print("  🧠 [Supervisor] : กำลังคิด...")
         response = supervisor_llm_text.invoke(
             [SystemMessage(content=system_prompt)] + messages
         )
@@ -419,7 +415,7 @@ def supervisor_node(state: AgentState):
         elif "finish" in content_resp:
             next_node = "FINISH"
         print(f"     ✅ ตัดสินใจ -> {next_node}")
-    except:
+    except Exception as e:
         next_node = "FINISH"
 
     if next_node not in registry.get_members() and next_node != "FINISH":
@@ -429,7 +425,7 @@ def supervisor_node(state: AgentState):
 
 def planner_node(state: AgentState):
     messages = state["messages"]
-    print(f"  🗺️ [Planner] : กำลังวางแผน...")
+    print("  🗺️ [Planner] : กำลังวางแผน...")
     sys_msg = SystemMessage(
         content="""
     Role: Technical Planner.
@@ -446,7 +442,7 @@ def planner_node(state: AgentState):
 
 def coder_node(state: AgentState):
     messages = state["messages"]
-    print(f"  📝 [Coder] : กำลังเขียนโค้ด...")
+    print("  📝 [Coder] : กำลังเขียนโค้ด...")
     # 🔥 สั่งให้ส่งงาน Critic แทน Tester
     sys_msg = SystemMessage(
         content="""
@@ -463,7 +459,7 @@ def coder_node(state: AgentState):
 # --- 🔥 NEW: Critic Node ---
 def critic_node(state: AgentState):
     messages = state["messages"]
-    print(f"  🤔 [Critic] : กำลังตรวจ Logic...")
+    print("  🤔 [Critic] : กำลังตรวจ Logic...")
 
     sys_msg = SystemMessage(
         content="""
@@ -487,7 +483,7 @@ def critic_node(state: AgentState):
 
 def tester_node(state: AgentState):
     messages = state["messages"]
-    print(f"  🧪 [Tester] : กำลังตรวจสอบ...")
+    print("  🧪 [Tester] : กำลังตรวจสอบ...")
     sys_msg = SystemMessage(content="Role: QA. Run scripts using 'run_script'.")
     response = tester_llm.invoke([sys_msg] + messages)
     return {"messages": [response], "sender": "Tester"}

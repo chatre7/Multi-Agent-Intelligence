@@ -4,9 +4,8 @@ Provides standardized tool interface for multi-agent system following Microsoft'
 Exposes tools as standardized service that agents can discover and invoke.
 """
 
-import json
 import asyncio
-from typing import Dict, List, Any, Callable, Optional, Union
+from typing import Dict, List, Any, Callable, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from enum import Enum
