@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 # Auth integration
-from auth_middleware import (
+from auth.auth_middleware import (
     AuthMiddleware,
     get_current_user,
     get_admin_user,

@@ -3,7 +3,7 @@
 import pytest
 import asyncio
 from datetime import datetime
-from health_monitor import HealthMonitor, HealthConfig, AgentHealth, get_health_monitor
+from monitoring.health_monitor import HealthMonitor, HealthConfig, AgentHealth, get_health_monitor
 
 
 class TestAgentHealth:

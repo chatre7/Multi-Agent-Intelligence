@@ -5,7 +5,7 @@ import json
 import os
 import tempfile
 import time
-from token_tracker import TokenTracker, TokenCosts, TokenRecord, get_token_tracker
+from monitoring.token_tracker import TokenTracker, TokenCosts, TokenRecord, get_token_tracker
 
 
 class TestTokenCosts:

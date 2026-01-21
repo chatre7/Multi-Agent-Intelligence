@@ -7,9 +7,9 @@ import asyncio
 from typing import Optional, Dict, Any, List
 
 from intent_classifier import IntentClassifierConfig, get_classifier
-from health_monitor import HealthConfig, get_health_monitor
+from monitoring.health_monitor import HealthConfig, get_health_monitor
 from metrics import get_metrics
-from token_tracker import get_token_tracker
+from monitoring.token_tracker import get_token_tracker
 from mcp_server import get_mcp_server
 from mcp_client import get_mcp_client
 from agent_versioning import get_version_manager, TransitionAction

@@ -4,15 +4,16 @@ import pytest
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
-from user_management_api import create_user_management_app
-from auth_middleware import AuthMiddleware
+from apis.users_router import router, health_router
+from auth.auth_middleware import AuthMiddleware
 
 
 @pytest.fixture
 def test_app():
     """Create test FastAPI app with user management router and auth middleware."""
     app = FastAPI()
-    app.include_router(create_user_management_app())
+    app.include_router(router)
+    app.include_router(health_router)
 
     # Add auth middleware with /users/health in exclude paths
     auth_middleware = AuthMiddleware(

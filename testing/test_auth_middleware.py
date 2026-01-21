@@ -3,7 +3,7 @@
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from auth_middleware import (
+from auth.auth_middleware import (
     AuthenticatedUser,
     AuthMiddleware,
     get_current_user,
