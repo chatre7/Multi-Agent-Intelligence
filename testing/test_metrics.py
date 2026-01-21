@@ -220,6 +220,11 @@ class TestGetMetrics:
     def test_get_metrics_with_custom_registry(self):
         """Test get_metrics with custom registry."""
         from prometheus_client import CollectorRegistry
+        from metrics import _metrics
+
+        # Reset singleton to allow custom registry
+        import metrics as metrics_module
+        metrics_module._metrics = None
 
         custom_registry = CollectorRegistry()
         metrics = get_metrics(custom_registry)

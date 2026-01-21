@@ -298,10 +298,14 @@ class TestAuthManager:
         config = AuthConfig(jwt_expiration_hours=0.0001)  # Very short expiry
         auth_mgr = AuthManager(config)
 
+        # Use unique username to avoid conflicts
+        import uuid
+        unique_user = f"user_expired_{uuid.uuid4().hex[:8]}"
+
         user = auth_mgr.create_user(
-            "user1", "email@test.com", "User 1", "password123", UserRole.USER
+            unique_user, f"{unique_user}@test.com", "Test User", "password123", UserRole.USER
         )
-        user = auth_mgr.authenticate_user("user1", "password123")
+        user = auth_mgr.authenticate_user(unique_user, "password123")
         token = auth_mgr.generate_token(user)
 
         # Wait for token to expire
