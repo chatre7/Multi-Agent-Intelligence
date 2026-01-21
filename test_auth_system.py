@@ -1,8 +1,6 @@
 """Unit tests for Authentication and RBAC System."""
 
 import pytest
-import tempfile
-import os
 from auth_system import (
     AuthManager,
     RBACManager,

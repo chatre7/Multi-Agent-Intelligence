@@ -12,12 +12,10 @@ from metrics import get_metrics
 from token_tracker import get_token_tracker
 from mcp_server import get_mcp_server
 from mcp_client import get_mcp_client
-from agent_versioning import get_version_manager, AgentState, TransitionAction
+from agent_versioning import get_version_manager, TransitionAction
 from auth_system import get_auth_manager, get_rbac_manager, UserRole
-from auth_middleware import get_current_user, get_admin_user, get_monitor_user
 
 # Import planner_agent_team_v3 to register MCP tools
-import planner_agent_team_v3
 
 
 class MultiAgentSystem:
@@ -195,8 +193,7 @@ class MultiAgentSystem:
         FastAPI
             Full system API with health and MCP endpoints.
         """
-        from fastapi import FastAPI, HTTPException
-        from fastapi.responses import JSONResponse
+        from fastapi import HTTPException
 
         # Start with health monitor app
         app = self.health_monitor.create_fastapi_app()
@@ -319,7 +316,6 @@ class MultiAgentSystem:
         role: str = "user",
     ):
         """Create a new user."""
-        from auth_system import UserRole
 
         role_enum = UserRole(role)
         return self.auth_manager.create_user(

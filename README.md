@@ -5,6 +5,8 @@ A production-ready multi-agent system built with LangGraph, LangChain, and Ollam
 ## Features
 
 - **Multi-Agent Architecture**: Orchestrated team of specialized agents (Planner, Coder, Critic, Tester, Reviewer)
+- **SpecKit Integration**: Spec-Driven Development toolkit for structured agent handoffs and API specifications
+- **User Management API**: Dedicated REST API for user CRUD operations with JWT auth and RBAC
 - **Intent Classifier**: Separate NLU/LLM cascade component for intelligent routing
 - **Memory System**: Long-term knowledge storage using ChromaDB vector embeddings
 - **Agent Registry**: Dynamic agent discovery and capability tracking
@@ -32,6 +34,43 @@ User Application (Streamlit)
     Memory System (ChromaDB)  Health Monitor ← NEW  MCP Server ← NEW
        ↓         ↓         ↓
     Token Tracker ← NEW  Prometheus Metrics ← NEW  MCP Client ← NEW
+```
+
+## APIs
+
+### User Management API
+A dedicated REST API for user management with JWT authentication and RBAC.
+
+**Features:**
+- Complete CRUD operations for users
+- JWT-based authentication
+- Role-based access control (ADMIN, DEVELOPER, OPERATOR, USER, AGENT, GUEST)
+- Input validation and error handling
+- Auto-generated OpenAPI documentation
+
+**Endpoints:**
+- `POST /v1/users` - Create user (admin only)
+- `GET /v1/users` - List users (admin only, paginated)
+- `GET /v1/users/{id}` - Get user details (admin or owner)
+- `PUT /v1/users/{id}` - Update user (admin or owner)
+- `DELETE /v1/users/{id}` - Delete user (admin only)
+- `GET /v1/users/me` - Get current user profile
+
+**Run API Server:**
+```bash
+python user_api.py
+```
+
+**API Documentation:** http://localhost:8000/docs
+
+**Health Check:** http://localhost:8000/health
+
+### Health Monitoring API
+System health monitoring with periodic checks and metrics.
+
+**Run Health Monitor:**
+```bash
+python health_monitor.py
 ```
 
 ## Quick Start
@@ -85,7 +124,7 @@ python system_integration.py
 # Install test dependencies
 pip install prometheus-client
 
-# Run all tests (113 tests)
+# Run all tests (211 tests)
 pytest
 
 # Run specific test
@@ -114,6 +153,41 @@ ruff format .
 mypy .
 ```
 
+### SpecKit Integration
+
+This project uses [SpecKit](https://github.com/github/spec-kit) for Spec-Driven Development, enabling structured agent handoffs and API specification generation.
+
+**Key Features:**
+- Constitution-based development guidelines
+- `/speckit.specify` - Define detailed requirements
+- `/speckit.plan` - Create technical implementation plans
+- `/speckit.tasks` - Generate actionable task breakdowns
+- Structured Planner-to-Coder handoffs
+
+**SpecKit Directory Structure:**
+```
+.specify/
+├── memory/
+│   └── constitution.md          # API development principles
+├── specs/
+│   └── user-management-api/     # API specifications
+│       ├── spec.md              # Requirements
+│       ├── plan.md              # Implementation plan
+│       └── tasks.md             # Task breakdown
+└── templates/                   # Spec templates
+```
+
+**Using SpecKit Commands:**
+```bash
+# Initialize (already done)
+specify init --here --ai opencode --force
+
+# Generate specifications (in agent workflow)
+# /speckit.specify [requirements]
+# /speckit.plan [technical details]
+# /speckit.tasks [generate tasks]
+```
+
 ## Project Structure
 
 ```
@@ -127,12 +201,23 @@ mypy .
 ├── agent_versioning.py        # Agent versioning state machine
 ├── auth_system.py             # RBAC authentication system
 ├── auth_middleware.py         # FastAPI auth middleware
+├── auth_service.py            # Auth service wrapper for APIs
+├── auth_dependencies.py       # FastAPI auth dependencies
+├── user_models.py             # Pydantic models for User API
+├── users_router.py            # FastAPI router for User Management API
+├── user_api.py                # Main FastAPI app for User Management
+├── test_user_api.py           # User API unit tests
+├── README_USER_API.md         # User Management API documentation
 ├── mcp_server.py             # MCP server for tool management
 ├── mcp_client.py              # MCP client for tool invocation
 ├── system_integration.py       # Main integration module
 ├── architecture.py            # Architecture documentation
 ├── agent_brain/               # Vector embeddings storage
 ├── checkpoints.db             # LangGraph state persistence
+├── .specify/                  # SpecKit specifications and templates
+│   ├── memory/constitution.md # API development constitution
+│   ├── specs/                 # Generated specifications
+│   └── templates/             # Spec templates
 ├── AGENTS.md                  # Agent development guidelines
 ├── MICROSOFT_COMPLIANCE.md    # Microsoft architecture compliance check
 ├── TESTING.md                 # Test suite documentation

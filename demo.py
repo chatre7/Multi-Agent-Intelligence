@@ -101,7 +101,7 @@ async def demo_agent_versioning():
     dev_ver = vm.get_current_version("calculator", "dev")
     prod_ver = vm.get_current_version("calculator", "prod")
 
-    print(f"\n🌍 Environment versions:")
+    print("\n🌍 Environment versions:")
     print(f"  Dev: v{dev_ver.version if dev_ver else 'None'}")
     print(f"  Prod: v{prod_ver.version if prod_ver else 'None'}")
 

@@ -1,8 +1,6 @@
 """Unit tests for System Integration."""
 
 import pytest
-import asyncio
-from unittest.mock import Mock, patch
 from system_integration import MultiAgentSystem, get_system
 
 
@@ -217,7 +215,6 @@ class TestGetSystem:
     def test_get_system_with_configs(self):
         """Test get_system with custom configs."""
         from intent_classifier import IntentClassifierConfig
-        from health_monitor import HealthConfig
 
         classifier_config = IntentClassifierConfig(model_name="gpt-oss:120b-cloud")
 
