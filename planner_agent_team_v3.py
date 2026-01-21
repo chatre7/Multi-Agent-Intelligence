@@ -552,6 +552,25 @@ def planner_node(state: AgentState):
         if hasattr(msg, "content") and msg.content:
             user_request += msg.content + "\n"
 
+    # Check if this is a simple greeting or casual message
+    simple_patterns = ["สวัสดี", "hello", "hi", "hey", "ทดสอบ", "test", "?"]
+    is_simple_message = any(pattern in user_request.lower() for pattern in simple_patterns)
+
+    # For simple greetings, respond briefly and finish
+    if is_simple_message and len(user_request.strip()) < 50:
+        simple_response = SystemMessage(
+            content=f"""สวัสดีครับ! ผม Planner Agent พร้อมช่วยคุณวางแผนและพัฒนาโปรเจกต์
+
+คุณสามารถขอให้ผมช่วย:
+- วางแผนพัฒนา feature ใหม่
+- ออกแบบระบบและ architecture
+- สร้างแผนการทำงานแบบละเอียด
+- ประสานงานกับ DevTeam เพื่อ implement
+
+มีอะไรให้ช่วยไหมครับ?"""
+        )
+        return {"messages": [simple_response], "sender": "Planner", "next_agent": "FINISH"}
+
     # Use SpecKit commands for structured planning
     try:
         # Step 1: Generate detailed specifications
@@ -620,7 +639,7 @@ The DevTeam has access to web search tools for real-time information."
         )
         response = planner_llm.invoke([sys_msg] + messages)
 
-    return {"messages": [response], "sender": "Planner"}
+    return {"messages": [response], "sender": "Planner", "next_agent": "DevTeam"}
 
 
 def coder_node(state: AgentState):
