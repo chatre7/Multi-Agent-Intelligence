@@ -300,12 +300,26 @@ These are strictly enforced in this codebase:
 
 ### Security Considerations
 
+**Authentication & Authorization:**
 - JWT tokens stored in memory, never logged
-- Passwords hashed with bcrypt (12 rounds)
+- JWT secret persisted securely (environment variable or file with 0o600 permissions)
+- Passwords hashed with bcrypt (12 rounds minimum)
 - Rate limiting enabled by default (100 req/min)
+- Account lockout after 5 failed attempts (15 min lockout)
+
+**File Operations:**
+- **Path injection prevention**: All file operations validate paths
+- **Directory traversal blocked**: `..` sequences not allowed
+- **Sandboxed writes**: Files restricted to `workspace/`, `output/`, `temp/` directories
+- **Extension whitelist**: Only safe extensions allowed (.py, .txt, .md, .json, .yaml, .csv)
+- **No absolute paths**: All paths must be relative
+
+**API Security:**
 - Input validation on all API endpoints
 - Prompt injection prevention in intent classifier
 - SQL injection protection via parameterized queries
+- No shell=True in subprocess calls
+- Timeout limits on all external calls
 
 ### SpecKit Integration
 

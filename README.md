@@ -594,6 +594,38 @@ Logs are written to:
 - **Multi-factor authentication** support
 - **Session management** with automatic expiration
 
+### File Operation Security
+
+**Safe File Writing:**
+```python
+# ✅ Allowed: Relative paths in safe directories
+save_file("workspace/script.py", code)
+save_file("output/results.json", data)
+
+# ❌ Blocked: Directory traversal
+save_file("../../../etc/passwd", code)  # Security Error
+
+# ❌ Blocked: Absolute paths
+save_file("/root/.ssh/authorized_keys", code)  # Security Error
+
+# ❌ Blocked: Dangerous extensions
+save_file("malware.exe", code)  # Security Error
+```
+
+### JWT Secret Management
+
+**Production (Recommended):**
+```bash
+# Set environment variable
+export JWT_SECRET_KEY="your-64-character-hex-string"
+```
+
+**Development:**
+```bash
+# Automatically persisted to data/.jwt_secret
+# File permissions: 0o600 (owner read/write only)
+```
+
 ### Security Features
 
 - Input validation and sanitization

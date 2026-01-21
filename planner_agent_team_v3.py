@@ -188,13 +188,76 @@ supervisor_llm_text = ChatOllama(model=MODEL_NAME, temperature=0, request_timeou
 
 @tool
 def save_file(filename: str, code: str):
-    """Saves valid Python code to a specific file."""
+    """Saves valid Python code to a specific file.
+
+    Security: Validates file path to prevent directory traversal and
+    restricts writes to allowed directories only.
+
+    Args:
+        filename: Relative path to save file (e.g., 'script.py' or 'output/data.py')
+        code: Content to write to file
+
+    Returns:
+        Success or error message
+    """
+    from pathlib import Path
+    import os
+
+    # Define allowed base directories for file operations
+    ALLOWED_DIRECTORIES = [
+        Path("./workspace").resolve(),
+        Path("./output").resolve(),
+        Path("./temp").resolve(),
+        Path("./scripts").resolve(),
+        Path(".").resolve(),  # Current directory
+    ]
+
+    # Create allowed directories if they don't exist
+    for allowed_dir in ALLOWED_DIRECTORIES[:3]:  # Skip current dir
+        allowed_dir.mkdir(exist_ok=True)
+
     try:
-        with open(filename, "w", encoding="utf-8") as f:
+        # Convert to absolute path and resolve any symlinks
+        file_path = Path(filename).resolve()
+
+        # Security check 1: Prevent directory traversal
+        if ".." in str(filename):
+            return f"❌ Security Error: Directory traversal (..) not allowed in path"
+
+        # Security check 2: Prevent absolute paths
+        if Path(filename).is_absolute():
+            return f"❌ Security Error: Absolute paths not allowed. Use relative paths."
+
+        # Security check 3: Validate file is within allowed directories
+        is_allowed = any(
+            str(file_path).startswith(str(allowed_dir))
+            for allowed_dir in ALLOWED_DIRECTORIES
+        )
+
+        if not is_allowed:
+            allowed_paths = ", ".join(str(d.relative_to(Path.cwd())) for d in ALLOWED_DIRECTORIES[:3])
+            return f"❌ Security Error: File must be in allowed directories: {allowed_paths}"
+
+        # Security check 4: Validate file extension
+        ALLOWED_EXTENSIONS = [".py", ".txt", ".md", ".json", ".yaml", ".yml", ".csv"]
+        if file_path.suffix.lower() not in ALLOWED_EXTENSIONS:
+            return f"❌ Security Error: File extension '{file_path.suffix}' not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+
+        # Write file
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(code)
-        return f"✅ File '{filename}' saved successfully."
+
+        rel_path = file_path.relative_to(Path.cwd())
+        return f"✅ File '{rel_path}' saved successfully."
+
+    except ValueError as e:
+        return f"❌ Path Error: {e}"
+    except PermissionError:
+        return f"❌ Permission Error: Cannot write to '{filename}'"
+    except OSError as e:
+        return f"❌ OS Error: {e}"
     except Exception as e:
-        return f"❌ Error saving file: {e}"
+        return f"❌ Unexpected Error: {type(e).__name__}: {e}"
 
 
 @tool

@@ -7,6 +7,7 @@ Provides JWT-based authentication, role management, and permission checking.
 import json
 import time
 import secrets
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
@@ -16,6 +17,49 @@ from enum import Enum
 import jwt as jwt_lib
 import bcrypt as bcrypt_lib
 from pydantic import BaseModel, Field
+
+
+def _get_or_create_jwt_secret() -> str:
+    """Get JWT secret from environment or persistent file.
+
+    Priority order:
+    1. JWT_SECRET_KEY environment variable
+    2. Persisted secret in data/.jwt_secret file
+    3. Generate new secret and persist it
+
+    Returns:
+        str: JWT secret key (64 character hex string)
+    """
+    # Try environment variable first (for production)
+    env_secret = os.getenv("JWT_SECRET_KEY")
+    if env_secret:
+        return env_secret
+
+    # Try persistent file (for development/single instance)
+    secret_file = Path("data/.jwt_secret")
+    secret_file.parent.mkdir(exist_ok=True)
+
+    if secret_file.exists():
+        try:
+            with open(secret_file, "r") as f:
+                stored_secret = f.read().strip()
+                if len(stored_secret) == 64:  # Validate it's 32 bytes hex (64 chars)
+                    return stored_secret
+        except Exception:
+            pass  # Fall through to generation
+
+    # Generate new secret and persist it
+    new_secret = secrets.token_hex(32)
+    try:
+        with open(secret_file, "w") as f:
+            f.write(new_secret)
+        # Set restrictive permissions (owner read/write only)
+        secret_file.chmod(0o600)
+    except Exception as e:
+        # If can't persist, at least warn
+        print(f"⚠️ Warning: Could not persist JWT secret: {e}")
+
+    return new_secret
 
 
 class UserRole(Enum):
@@ -65,7 +109,9 @@ class Permission(Enum):
 class AuthConfig(BaseModel):
     """Authentication configuration."""
 
-    jwt_secret_key: str = Field(default_factory=lambda: secrets.token_hex(32))
+    jwt_secret_key: str = Field(
+        default_factory=lambda: _get_or_create_jwt_secret()
+    )
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: float = 24.0
     bcrypt_rounds: int = 12
