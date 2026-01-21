@@ -11,6 +11,7 @@ from langchain_core.documents import Document
 
 from langchain_core.messages import (
     BaseMessage,
+    HumanMessage,
     SystemMessage,
     ToolMessage,
     AIMessage,
@@ -463,7 +464,12 @@ def supervisor_node(state: AgentState):
     if isinstance(last_message, ToolMessage):
         return {"next_agent": sender}
 
-    # 🚀 Dynamic Group Chat: Use intelligent router
+    # For User messages, always route to Planner for intelligent routing
+    if sender == "User":
+        print("  🎯 [Supervisor] : User message detected, routing to Planner")
+        return {"next_agent": "Planner"}
+
+    # For other senders, use dynamic router
     router = get_next_speaker_router()
 
     # Get conversation state for routing decisions
@@ -476,11 +482,6 @@ def supervisor_node(state: AgentState):
     # Determine next speaker based on current context
     message_content = str(last_message.content)
     next_speaker = router.get_next_speaker(sender, message_content, conversation_state)
-
-    # Prevent infinite loop: supervisor should not route to itself from user messages
-    if next_speaker == "supervisor" and sender == "User":
-        print("  ⚠️ [Supervisor] : Preventing self-loop, routing to Planner")
-        next_speaker = "Planner"
 
     # Check for termination conditions
     if router.should_terminate(message_content, conversation_state["iteration_count"]):
@@ -546,15 +547,24 @@ def planner_node(state: AgentState):
     messages = state["messages"]
     print("  🗺️ [Planner] : กำลังวางแผนด้วย SpecKit...")
 
-    # Extract the user request from messages
+    # Extract only the LAST user request (HumanMessage) from messages
     user_request = ""
-    for msg in messages:
-        if hasattr(msg, "content") and msg.content:
-            user_request += msg.content + "\n"
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage) and hasattr(msg, "content") and msg.content:
+            user_request = msg.content
+            break
 
     # Check if this is a simple greeting or casual message
-    simple_patterns = ["สวัสดี", "hello", "hi", "hey", "ทดสอบ", "test", "?"]
-    is_simple_message = any(pattern in user_request.lower() for pattern in simple_patterns)
+    import re
+    # Thai patterns use simple substring matching (no word boundaries)
+    thai_greetings = ["สวัสดี", "ทดสอบ"]
+    # English patterns use word boundary matching
+    english_patterns = [r"\bhello\b", r"\bhi\b", r"\bhey\b", r"\btest\b", r"\?"]
+
+    is_simple_message = (
+        any(thai in user_request for thai in thai_greetings) or
+        any(re.search(pattern, user_request.lower()) for pattern in english_patterns)
+    )
 
     # For simple greetings, respond briefly and finish
     if is_simple_message and len(user_request.strip()) < 50:
@@ -648,16 +658,17 @@ The DevTeam has access to web search tools for real-time information."
     # Analyze request and determine appropriate next agent
     request_lower = user_request.lower()
 
-    # Determine next agent based on request type
-    if any(word in request_lower for word in ["review", "รีวิว", "code review", "ตรวจสอบโค้ด", "quality"]):
+    # Determine next agent based on request type (check data analysis first to avoid conflicts)
+    if any(word in request_lower for word in ["analyze data", "วิเคราะห์ข้อมูล", "analytics", "statistics", "สถิติ"]) or \
+       ("analyze" in request_lower and "data" in request_lower):
+        next_agent = "DataAnalysisAgent"
+        print("  🎯 [Planner] : Routing to DataAnalysisAgent for data analysis")
+    elif any(word in request_lower for word in ["review", "รีวิว", "code review", "ตรวจสอบโค้ด", "quality"]):
         next_agent = "CodeReviewAgent"
         print("  🎯 [Planner] : Routing to CodeReviewAgent for code review")
     elif any(word in request_lower for word in ["research", "ค้นคว้า", "หาข้อมูล", "search", "investigate"]):
         next_agent = "ResearchAgent"
         print("  🎯 [Planner] : Routing to ResearchAgent for research")
-    elif any(word in request_lower for word in ["analyze data", "วิเคราะห์ข้อมูล", "analytics", "statistics", "สถิติ"]):
-        next_agent = "DataAnalysisAgent"
-        print("  🎯 [Planner] : Routing to DataAnalysisAgent for data analysis")
     elif any(word in request_lower for word in ["document", "เอกสาร", "docs", "api doc", "readme"]):
         next_agent = "DocumentationAgent"
         print("  🎯 [Planner] : Routing to DocumentationAgent for documentation")
