@@ -434,25 +434,40 @@ def planner_node(state: AgentState):
         tasks_command = "/speckit.tasks"
         # This would generate the detailed task list
 
-        # Create dynamic response with clear next steps
+        # Create dynamic response with web search capabilities
         dynamic_response = f"""
-🎯 **Strategic Analysis Complete**
+🎯 **Strategic Analysis Complete - Web Search Enabled**
 
 **Current Assessment:**
 - **Request**: {user_request.strip()}
 - **Complexity**: High - requires structured development approach
 - **Next Phase**: Implementation with DevTeam collaboration
 
-**Recommended Approach:**
-1. **DevTeam Implementation**: Coder → Critic → Tester iterative cycle
-2. **Quality Assurance**: Automated testing and code review
-3. **Completion Criteria**: All tests pass, code approved
+**Available Web Search Tools:**
+- web_search(): Real-time information access (free, 24h cache, $5/day budget)
+- web_search_with_domain(): Domain-specific research (docs, APIs, tutorials)
 
-**Status**: Ready for development phase.
+**Recommended Approach:**
+1. **Research Phase**: Use web_search() to gather current information and best practices
+2. **DevTeam Implementation**: Coder → Critic → Tester iterative cycle
+3. **Quality Assurance**: Automated testing and code review
+4. **Completion Criteria**: All tests pass, code approved
+
+**DevTeam Brief:**
+"Research current technologies using web_search(), then implement following specifications:
+1. Use web_search() to research current technologies and best practices
+2. Review detailed requirements in `.specify/specs/` directory
+3. Execute implementation according to technical plan
+4. Complete all acceptance criteria with 100% test coverage
+5. Report back only when fully complete and tested
+
+The DevTeam has access to web search tools for real-time information."
+
+**Status**: Ready for development phase with web search capabilities enabled.
 **Next Speaker**: DevTeam should begin implementation.
 """
 
-        response = SystemMessage(content=spec_driven_response)
+        response = SystemMessage(content=dynamic_response)
 
     except Exception as e:
         print(f"    ⚠️ SpecKit integration error: {e}")
@@ -874,23 +889,34 @@ def dev_team_coder_node(state: DevTeamState) -> DevTeamState:
 
     print("    📝 [DevTeam:Coder] กำลังพัฒนาโค้ด...")
 
-    # Enhanced prompt with dynamic conversation context
+    # Enhanced prompt with web search capabilities
     dynamic_prompt = f"""
-Role: Senior Developer in collaborative development team.
+Role: Senior Developer in collaborative development team with web search access.
 
 **Current Context:**
 - Task: {task_summary or "Implement requested feature"}
 - Team: Working with Critic and Tester for quality assurance
-- Process: Code → Review → Test → Iterate
+- Process: Research → Code → Review → Test → Iterate
+
+**Available Tools:**
+- web_search(): Search for current information, API docs, library versions
+- web_search_with_domain(): Search specific domains (docs.python.org, fastapi.tiangolo.com)
 
 **Implementation Guidelines:**
-1. Write clean, well-documented code following project standards
-2. Include proper error handling and edge cases
-3. Consider scalability and maintainability
-4. Save code to appropriate files with clear naming
-5. Provide implementation summary for team review
+1. **Research First**: Use web_search() to check current best practices, API docs, and library versions
+2. Write clean, well-documented code following project standards
+3. Include proper error handling and edge cases
+4. Consider scalability and maintainability
+5. Save code to appropriate files with clear naming
+6. Provide implementation summary for team review
+
+**Research Workflow:**
+- Before coding: Search for current documentation and examples
+- During implementation: Verify technical assumptions with web search
+- For new technologies: Research compatibility and best practices
 
 **Collaboration Flow:**
+- After research: Implement based on current information
 - After coding: Send to Critic for quality review
 - Address any issues found during review
 - Code will be tested by Tester before final approval
@@ -898,8 +924,9 @@ Role: Senior Developer in collaborative development team.
 **Communication Style:**
 Be clear about what was implemented and any assumptions made.
 If you encounter issues, explain them clearly for team resolution.
+Reference any web search findings that influenced the implementation.
 
-Implementation ready - proceeding with development.
+Implementation ready - proceeding with research and development.
 """
 
     sys_msg = SystemMessage(content=dynamic_prompt)

@@ -434,11 +434,12 @@ def get_mcp_server() -> MCPServer:
     return _mcp_server
 
 
-if __name__ == "__main__":
-    # Example usage
+# Register tools when module is imported (not just when run as main)
+def _register_default_tools():
+    """Register default tools when MCP server is initialized"""
     server = get_mcp_server()
 
-    # Register example tools
+    # Register calculator tool (existing)
     async def calculator(a: float, b: float, operation: str) -> float:
         """Simple calculator tool."""
         if operation == "add":
@@ -474,5 +475,106 @@ if __name__ == "__main__":
         tags=["math", "calculator"],
     )
 
-    print("MCP Server initialized with calculator tool")
-    print(f"Available tools: {server.list_tools()}")
+    # Register web search tools
+    try:
+        from search_provider import perform_web_search, perform_domain_search
+
+        def web_search(query: str, num_results: int = 5) -> str:
+            """Search the web for real-time information and documentation.
+
+            Features:
+            - Free DuckDuckGo provider
+            - 24-hour file-based caching
+            - $5 daily budget with notifications
+            - RBAC permissions (configurable per role)
+            - Graceful error handling (agents continue working)
+            - Anonymized logging for privacy
+            - Circuit breaker for budget/rate limit protection
+            """
+            # Get current user context (from auth middleware)
+            # For now, use default values - in production, get from actual context
+            user_role = "developer"  # Default for development
+            user_id = "mcp_user"
+
+            return perform_web_search(query, num_results, None, user_role, user_id)
+
+        def web_search_with_domain(
+            query: str, domain: str, num_results: int = 3
+        ) -> str:
+            """Search specific domains for targeted information.
+
+            Useful for finding documentation, API references, and official guides
+            from trusted sources.
+            """
+            user_role = "developer"
+            user_id = "mcp_user"
+
+            return perform_domain_search(query, domain, num_results, user_role, user_id)
+
+        server.register_tool(
+            name="web_search",
+            tool_function=web_search,
+            description="Search the web for current information, documentation, and real-time data",
+            schema={
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query for web information",
+                    },
+                    "num_results": {
+                        "type": "integer",
+                        "description": "Number of results to return (default: 5)",
+                        "minimum": 1,
+                        "maximum": 10,
+                    },
+                },
+            },
+            tags=["search", "web", "information", "research"],
+        )
+
+        server.register_tool(
+            name="web_search_with_domain",
+            tool_function=web_search_with_domain,
+            description="Search within specific domains for targeted, reliable information",
+            schema={
+                "type": "object",
+                "required": ["query", "domain"],
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"},
+                    "domain": {
+                        "type": "string",
+                        "description": "Domain to search within (e.g., 'docs.python.org')",
+                    },
+                    "num_results": {
+                        "type": "integer",
+                        "description": "Number of results to return (default: 3)",
+                        "minimum": 1,
+                        "maximum": 5,
+                    },
+                },
+            },
+            tags=["search", "web", "documentation", "domain-specific"],
+        )
+
+        print(f"✓ Web search tools registered with MCP Server")
+
+    except ImportError as e:
+        print(f"⚠️ Web search tools not available: {e}")
+    except Exception as e:
+        print(f"⚠️ Error registering web search tools: {e}")
+
+
+# Register tools when module is imported
+_register_default_tools()
+
+if __name__ == "__main__":
+    # Example usage when run directly
+    server = get_mcp_server()
+    print("MCP Server initialized")
+    print(f"Available tools: {len(server.list_tools())} tools registered")
+
+    # Display registered tools
+    for tool in server.list_tools():
+        print(f"  - {tool['name']}: {tool['description'][:50]}...")
