@@ -197,6 +197,12 @@ specify init --here --ai opencode --force
 │   └── apis/
 │       └── user_api.py           # User Management API server
 │
+├── 🎯 Examples & Demos
+│   ├── demos/
+│   │   ├── demo.py               # Main demo script
+│   │   ├── demo_agent_versioning.py # Agent versioning demo
+│   │   └── start.sh              # Quick start script
+│
 ├── 🤖 Agent System
 │   ├── planner_agent_team_v3.py  # Core agent orchestrator (SpecKit-enhanced)
 │   ├── intent_classifier.py      # Intent classification component
@@ -220,10 +226,12 @@ specify init --here --ai opencode --force
 │       └── user_models.py        # Pydantic models for User API
 │
 ├── 📊 Monitoring & Metrics
-│   ├── metrics.py                # Prometheus metrics integration
-│   └── token_tracker.py          # Token consumption tracking
+│   ├── monitoring/
+│   │   ├── health_monitor.py     # Health monitoring API
+│   │   └── token_tracker.py      # Token consumption tracking
+│   └── metrics.py                # Prometheus metrics integration
 │
-├── 🛠️  Development Tools
+├── 🛠️ Development Tools
 │   ├── mcp_client.py             # MCP tool client
 │   └── .specify/                 # SpecKit specifications & templates
 │       ├── memory/constitution.md # API development constitution
@@ -232,13 +240,16 @@ specify init --here --ai opencode --force
 │
 ├── 📋 Data & Models
 │   ├── agent_brain/              # Vector embeddings storage
-│   └── checkpoints.db            # LangGraph state persistence
+│   ├── data/
+│   │   ├── users.json            # User data storage
+│   │   ├── agent_versions.json   # Agent version data
+│   │   ├── checkpoints.db        # LangGraph state persistence
+│   │   └── token_usage_export_*.json # Token usage exports
 │
 ├── 🧪 Testing
-│   ├── test_*.py                 # Unit test files (211 tests total, 100% pass)
 │   ├── testing/
+│   │   ├── test_*.py             # All unit test files (211 tests total, 100% pass)
 │   │   ├── test_user_api.py      # User API specific tests
-│   │   ├── test_user_management_api.py # Additional API tests
 │   │   ├── TESTING.md            # Test suite documentation
 │   │   └── TEST_RESULTS.md       # Test results summary
 │
