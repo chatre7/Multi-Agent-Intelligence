@@ -2,7 +2,7 @@
 
 ## Overall Status
 
-✅ **113/113 tests passing** across all components
+✅ **211/211 tests passing** across all components
 
 🎯 **100% Test Coverage Achieved**
 
@@ -13,7 +13,7 @@ All tests pass with `prometheus-client` dependency installed.
 ### ✅ Intent Classifier (16/16 Passed)
 
 ```bash
-pytest test_intent_classifier.py -v
+pytest testing/test_intent_classifier.py -v
 ```
 
 | Test | Status |
@@ -43,7 +43,7 @@ pytest test_intent_classifier.py -v
 ### ✅ Health Monitor (22/22 Passed)
 
 ```bash
-pytest test_health_monitor.py -v
+pytest testing/test_health_monitor.py -v
 ```
 
 | Test | Status |
@@ -77,7 +77,7 @@ pytest test_health_monitor.py -v
 
 ```bash
 pip install prometheus-client
-pytest test_metrics.py -v
+pytest testing/test_metrics.py -v
 ```
 
 **Status:** ✅ All tests passing with prometheus-client installed
@@ -85,7 +85,7 @@ pytest test_metrics.py -v
 ### ✅ Token Tracker (25/25 Passed)
 
 ```bash
-pytest test_token_tracker.py -v
+pytest testing/test_token_tracker.py -v
 ```
 
 **Status:** ✅ All tests passing, syntax errors fixed
@@ -94,7 +94,7 @@ pytest test_token_tracker.py -v
 
 ```bash
 pip install prometheus-client
-pytest test_system_integration.py -v
+pytest testing/test_system_integration.py -v
 ```
 
 **Status:** ✅ All tests passing with prometheus-client installed
@@ -104,10 +104,10 @@ pytest test_system_integration.py -v
 ### Quick Test Run (No Additional Dependencies)
 ```bash
 # Run core tests only
-pytest test_intent_classifier.py test_health_monitor.py -v
+pytest testing/test_intent_classifier.py testing/test_health_monitor.py -v
 
 # With coverage
-pytest test_intent_classifier.py test_health_monitor.py --cov=.
+pytest testing/test_intent_classifier.py testing/test_health_monitor.py --cov=.
 ```
 
 ### Full Test Run (All Tests)
