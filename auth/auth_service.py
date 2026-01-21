@@ -5,11 +5,11 @@ Provides a clean interface for the User Management API to interact with
 the existing auth_system.py, abstracting the underlying implementation.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from datetime import datetime
 
-from auth_system import get_auth_manager, UserRole as AuthUserRole
-from auth.user_models import User, UserCreate, UserUpdate, UserResponse, UserRole
+from auth_system import get_auth_manager
+from auth.user_models import User, UserCreate, UserUpdate, UserRole
 
 
 class UserManagementService:

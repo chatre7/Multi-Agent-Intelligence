@@ -1,6 +1,32 @@
 # Multi-Agent Intelligence Platform
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/tests-198%2F198-brightgreen.svg)](https://github.com/your-repo/Multi-Agent-Intelligence)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/your-repo/Multi-Agent-Intelligence)
+
 A production-ready multi-agent system built with LangGraph, LangChain, and Ollama, implementing Microsoft's multi-agent architecture best practices including RBAC Authentication, Agent Versioning, MCP (Model Context Protocol), and comprehensive observability with 100% test coverage (198/198 tests passing).
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [APIs](#apis)
+- [Agent Roles](#agent-roles)
+- [Development](#development)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Monitoring & Observability](#monitoring--observability)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
 
 ## Features
 
@@ -19,27 +45,237 @@ A production-ready multi-agent system built with LangGraph, LangChain, and Ollam
 - **Human-in-the-Loop**: Approval workflow for tool execution
 - **Persistent State**: SQLite checkpointing for session continuity
 - **Web Interface**: Streamlit-based UI for agent interaction
+- **100% Test Coverage**: Comprehensive testing suite with 198/198 tests passing
 
 ## Architecture
 
 ```
-User Application (Streamlit)
-       ↓
-   Orchestrator (Supervisor)
-       ↓
-    Intent Classifier ← NEW
-       ↓
-   Agent Registry → Specialized Agents
-       ↓         ↓         ↓
-    Memory System (ChromaDB)  Health Monitor ← NEW  MCP Server ← NEW
-       ↓         ↓         ↓
-    Token Tracker ← NEW  Prometheus Metrics ← NEW  MCP Client ← NEW
+┌─────────────────────────────────────────────────────────────┐
+│                User Application (Streamlit)                 │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Orchestrator (Supervisor)                   │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Intent Classifier ← NEW                     │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 Agent Registry → Specialized Agents         │
+└─────────────────────────┼─────────┼─────────┼───────────────┘
+                          │         │         │
+                          ▼         ▼         ▼
+┌─────────────────────────────────────────────────────────────┐
+│    Memory System (ChromaDB)  │ Health Monitor │ MCP Server │
+└─────────────────────────┼─────────┼─────────┼───────────────┘
+                          │         │         │
+                          ▼         ▼         ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Token Tracker ← NEW   │ Prometheus Metrics │ MCP Client ← NEW │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+- **Python 3.8+**
+- **Ollama** (for local LLM models)
+- **Git** (for cloning repository)
+- **pip** (Python package installer)
+
+### System Requirements
+
+- **RAM**: Minimum 8GB, Recommended 16GB+
+- **Storage**: 10GB+ free space for models and data
+- **OS**: Linux, macOS, or Windows (with WSL recommended)
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-repo/Multi-Agent-Intelligence.git
+cd Multi-Agent-Intelligence
+```
+
+### 2. Create Virtual Environment
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Install Ollama and Models
+
+```bash
+# Install Ollama (follow instructions at https://ollama.ai/)
+
+# Pull required models
+ollama pull nomic-embed-text
+ollama pull gpt-oss:120b-cloud
+
+# Verify installation
+ollama list
+```
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# Database Configuration
+DATABASE_URL=sqlite:///data/checkpoints.db
+
+# Authentication
+JWT_SECRET_KEY=your-super-secret-key-here
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Ollama Configuration
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gpt-oss:120b-cloud
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+
+# Monitoring
+PROMETHEUS_PORT=8000
+HEALTH_CHECK_INTERVAL=60
+
+# Security
+RATE_LIMIT_REQUESTS_PER_MINUTE=100
+MAX_TOKENS_PER_REQUEST=1000
+DAILY_COST_LIMIT=10.0
+
+# Agent Configuration
+MAX_AGENT_RETRIES=3
+AGENT_TIMEOUT_SECONDS=300
+MEMORY_VECTOR_DIMENSION=768
+
+# MCP Configuration
+MCP_SERVER_PORT=3000
+MCP_CLIENT_TIMEOUT=30
+```
+
+### Configuration Files
+
+- `requirements.txt`: Python dependencies
+- `.env`: Environment variables (create this file)
+- `.gitignore`: Git ignore rules
+
+## Quick Start
+
+### Basic Setup
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Start Ollama service (in another terminal)
+ollama serve
+
+# 3. Run the main application
+streamlit run app.py
+```
+
+Open your browser to `http://localhost:8501` to access the web interface.
+
+### Advanced Setup with Monitoring
+
+```bash
+# Terminal 1: Start Ollama
+ollama serve
+
+# Terminal 2: Start Health Monitor
+python health_monitor.py
+
+# Terminal 3: Start Metrics Server
+python metrics.py
+
+# Terminal 4: Start User Management API
+python user_api.py
+
+# Terminal 5: Start Main Application
+streamlit run app.py
+```
+
+## Usage
+
+### Web Interface
+
+The main interface is built with Streamlit. Access it at `http://localhost:8501`.
+
+**Features:**
+- Interactive agent conversation
+- Task submission and monitoring
+- Real-time status updates
+- Token usage tracking
+
+### Command Line Interface
+
+```bash
+# Run individual Python scripts
+python calculator.py
+python circle_area.py
+
+# Run demos
+python demos/demo.py
+python demos/demo_agent_versioning.py
+
+# Run integration tests
+python system_integration.py
+```
+
+### API Usage
+
+#### User Management API
+
+```bash
+# Start API server
+python user_api.py
+
+# API will be available at http://localhost:8000
+# Documentation: http://localhost:8000/docs
+# Health check: http://localhost:8000/health
+```
+
+#### Usage Examples
+
+```python
+# Python interactions
+from planner_agent_team_v3 import app as agent_app
+
+# Initialize agent system
+agent_system = agent_app.get_system()
+
+# Submit a task
+result = agent_system.process_task("Create a calculator function in Python")
+print(result)
 ```
 
 ## APIs
 
 ### User Management API
+
 A dedicated REST API for user management with JWT authentication and RBAC.
+
+**Base URL:** `http://localhost:8000/v1`
 
 **Features:**
 - Complete CRUD operations for users
@@ -49,101 +285,117 @@ A dedicated REST API for user management with JWT authentication and RBAC.
 - Auto-generated OpenAPI documentation
 
 **Endpoints:**
-- `POST /v1/users` - Create user (admin only)
-- `GET /v1/users` - List users (admin only, paginated)
-- `GET /v1/users/{id}` - Get user details (admin or owner)
-- `PUT /v1/users/{id}` - Update user (admin or owner)
-- `DELETE /v1/users/{id}` - Delete user (admin only)
-- `GET /v1/users/me` - Get current user profile
+- `POST /users` - Create user (admin only)
+- `GET /users` - List users (admin only, paginated)
+- `GET /users/{id}` - Get user details (admin or owner)
+- `PUT /users/{id}` - Update user (admin or owner)
+- `DELETE /users/{id}` - Delete user (admin only)
+- `GET /users/me` - Get current user profile
 
-**Run API Server:**
+**Authentication:**
 ```bash
-python user_api.py
+# Login to get JWT token
+curl -X POST "http://localhost:8000/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password"}'
+
+# Use token in subsequent requests
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  "http://localhost:8000/v1/users/me"
 ```
-
-**API Documentation:** http://localhost:8000/docs
-
-**Health Check:** http://localhost:8000/health
 
 ### Health Monitoring API
+
 System health monitoring with periodic checks and metrics.
 
-**Run Health Monitor:**
-```bash
-python health_monitor.py
-```
-
-## Quick Start
-
-### Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-### Ollama Setup
-
-```bash
-# Pull required models
-ollama pull nomic-embed-text
-ollama pull gpt-oss:120b-cloud
-```
-
-### Run Application
-
-```bash
-# Start Streamlit app (Main interface)
-streamlit run app.py
-
-# Start Health Monitor API (Optional)
-python health_monitor.py
-
-# Start Metrics Server (Optional)
-python metrics.py
-
-# Run Integration Tests
-python system_integration.py
-```
+**Endpoints:**
+- `GET /health` - Overall system health
+- `GET /health/agents/{name}` - Specific agent health
+- `GET /status/all` - Current agent statuses
+- `GET /metrics` - System metrics summary
 
 ## Agent Roles
 
-| Agent | Description |
-|-------|-------------|
-| **Planner** | Breaks down complex tasks into actionable steps |
-| **Coder** | Writes Python code and saves to files |
-| **Critic** | Reviews code logic and quality before testing |
-| **Tester** | Runs scripts and validates output |
-| **Reviewer** | Final verification of results |
-| **Supervisor** | Orchestrates agent workflow and routing |
+| Agent | Description | Responsibilities |
+|-------|-------------|------------------|
+| **Planner** | Breaks down complex tasks into actionable steps | Task decomposition, workflow planning |
+| **Coder** | Writes Python code and saves to files | Code generation, file operations |
+| **Critic** | Reviews code logic and quality before testing | Code review, quality assurance |
+| **Tester** | Runs scripts and validates output | Test execution, validation |
+| **Reviewer** | Final verification of results | Result verification, approval |
+| **Supervisor** | Orchestrates agent workflow and routing | Workflow orchestration, decision making |
 
 ## Development
 
-### Testing
+### Code Style
+
+This project follows strict code conventions. See [AGENTS.md](AGENTS.md) for detailed guidelines.
+
+**Key Standards:**
+- Type hints for all functions
+- Google-style docstrings
+- Snake_case naming
+- 50-line function limit
+- Comprehensive error handling
+
+### Development Workflow
+
+1. **Planning**: Use SpecKit for requirement specification
+2. **Implementation**: Follow agent development patterns
+3. **Testing**: Write tests before implementation (TDD)
+4. **Review**: Use Critic and Reviewer agents
+5. **Integration**: Run full test suite
+
+### SpecKit Integration
+
+This project uses [SpecKit](https://github.com/github/spec-kit) for Spec-Driven Development.
+
+**Key Features:**
+- Constitution-based development guidelines
+- `/speckit.specify` - Define detailed requirements
+- `/speckit.plan` - Create technical implementation plans
+- `/speckit.tasks` - Generate actionable task breakdowns
+
+## Testing
+
+### Test Suite
 
 ```bash
-# Install test dependencies
-pip install prometheus-client
-
-# Run all tests (211 tests)
+# Run all tests
 pytest
 
-# Run specific test
-pytest test_intent_classifier.py::TestIntentClassifier::test_initialization_default_config
-
-# With coverage (100% coverage achieved)
+# Run with coverage
 pytest --cov=. --cov-report=html
 
-# Run specific component tests
-pytest test_intent_classifier.py test_health_monitor.py
+# Run specific tests
+pytest test_intent_classifier.py
+pytest test_health_monitor.py::TestHealthMonitor::test_health_check
+
+# Run tests in parallel
+pytest -n auto
 ```
 
-### Linting & Formatting
+### Test Coverage Results
+
+| Component | Tests | Coverage |
+|-----------|-------|----------|
+| Intent Classifier | 16/16 | ✅ 100% |
+| Health Monitor | 22/22 | ✅ 100% |
+| Metrics System | 30/30 | ✅ 100% |
+| Token Tracker | 25/25 | ✅ 100% |
+| Agent Versioning | 25/25 | ✅ 100% |
+| MCP Protocol | 31/31 | ✅ 100% |
+| RBAC/Authentication | 29/29 | ✅ 100% |
+| System Integration | 20/20 | ✅ 100% |
+| **Total** | **198/198** | **100%** |
+
+### Code Quality
 
 ```bash
-# Check code
+# Lint code
 ruff check .
 
-# Auto-fix
+# Auto-fix issues
 ruff check --fix .
 
 # Format code
@@ -153,40 +405,243 @@ ruff format .
 mypy .
 ```
 
-### SpecKit Integration
+## Deployment
 
-This project uses [SpecKit](https://github.com/github/spec-kit) for Spec-Driven Development, enabling structured agent handoffs and API specification generation.
+### Local Deployment
 
-**Key Features:**
-- Constitution-based development guidelines
-- `/speckit.specify` - Define detailed requirements
-- `/speckit.plan` - Create technical implementation plans
-- `/speckit.tasks` - Generate actionable task breakdowns
-- Structured Planner-to-Coder handoffs
-
-**SpecKit Directory Structure:**
-```
-.specify/
-├── memory/
-│   └── constitution.md          # API development principles
-├── specs/
-│   └── user-management-api/     # API specifications
-│       ├── spec.md              # Requirements
-│       ├── plan.md              # Implementation plan
-│       └── tasks.md             # Task breakdown
-└── templates/                   # Spec templates
-```
-
-**Using SpecKit Commands:**
 ```bash
-# Initialize (already done)
-specify init --here --ai opencode --force
+# Production mode
+streamlit run app.py --server.port 8501 --server.address 0.0.0.0
 
-# Generate specifications (in agent workflow)
-# /speckit.specify [requirements]
-# /speckit.plan [technical details]
-# /speckit.tasks [generate tasks]
+# With monitoring
+docker-compose up -d
 ```
+
+### Docker Deployment
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  multi-agent:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  ollama_data:
+```
+
+### Cloud Deployment
+
+**Recommended Platforms:**
+- AWS EC2 with GPU instances
+- Google Cloud AI Platform
+- Azure Machine Learning
+- DigitalOcean Droplets
+
+**Requirements:**
+- GPU acceleration for better performance
+- Persistent storage for vector embeddings
+- Load balancer for API services
+
+## Monitoring & Observability
+
+### Health Monitoring
+
+```bash
+# Start health monitor
+python health_monitor.py
+
+# Check health
+curl http://localhost:8000/health
+```
+
+### Metrics (Prometheus)
+
+```bash
+# Start metrics server
+python metrics.py
+
+# Access metrics
+curl http://localhost:8000/metrics
+```
+
+**Available Metrics:**
+- `agent_token_usage_total` - Token consumption per agent
+- `agent_calls_total` - Agent invocation count
+- `agent_latency_seconds` - Execution time histogram
+- `tool_calls_total` - Tool invocation count
+- `agent_errors_total` - Error rate tracking
+
+### Token Tracking
+
+```python
+from monitoring.token_tracker import get_token_tracker
+
+tracker = get_token_tracker(daily_cost_limit=10.0)
+tracker.register_usage_callback(lambda record: print(f"Used {record.total_tokens} tokens"))
+
+summary = tracker.get_session_summary()
+print(f"Total cost: ${summary['total_cost']:.2f}")
+```
+
+### Logging
+
+Logs are written to:
+- `logs/agent_system.log` - Main application logs
+- `logs/health_monitor.log` - Health monitoring logs
+- `logs/api_access.log` - API access logs
+
+## Security
+
+### Authentication & Authorization
+
+- **JWT-based authentication** with secure token management
+- **Role-based access control (RBAC)** with granular permissions
+- **Multi-factor authentication** support
+- **Session management** with automatic expiration
+
+### Security Features
+
+- Input validation and sanitization
+- Prompt injection prevention
+- SQL injection protection
+- XSS protection
+- Rate limiting and abuse detection
+- Audit logging and monitoring
+- Account lockout protection
+
+### Roles & Permissions
+
+| Role | Permissions |
+|------|-------------|
+| **Admin** | Full system access, user management, system configuration |
+| **Developer** | Agent creation, tool access, monitoring, code deployment |
+| **Operator** | Agent deployment, system monitoring, health checks |
+| **User** | Basic agent interaction, task submission |
+| **Agent** | Inter-agent communication, tool invocation |
+| **Guest** | Read-only access, limited functionality |
+
+## Troubleshooting
+
+### Common Issues
+
+#### Ollama Connection Issues
+
+```bash
+# Check if Ollama is running
+curl http://localhost:11434/api/tags
+
+# Restart Ollama service
+ollama serve
+
+# Pull models again
+ollama pull nomic-embed-text
+ollama pull gpt-oss:120b-cloud
+```
+
+#### Memory Issues
+
+```bash
+# Clear vector embeddings cache
+rm -rf agent_brain/
+
+# Clear checkpoints
+rm data/checkpoints.db
+
+# Restart application
+streamlit run app.py
+```
+
+#### API Connection Issues
+
+```bash
+# Check API health
+curl http://localhost:8000/health
+
+# Check API documentation
+open http://localhost:8000/docs
+
+# Restart API server
+python user_api.py
+```
+
+#### Test Failures
+
+```bash
+# Run tests with verbose output
+pytest -v
+
+# Run specific failing test
+pytest test_specific.py::TestClass::test_method -s
+
+# Clear test cache
+pytest --cache-clear
+```
+
+### Performance Optimization
+
+- **GPU Acceleration**: Use GPU instances for better performance
+- **Model Optimization**: Use smaller models for faster inference
+- **Caching**: Implement response caching for repeated queries
+- **Load Balancing**: Distribute load across multiple instances
+
+### Support
+
+For additional help:
+1. Check the [documentation](docs/)
+2. Review [AGENTS.md](AGENTS.md) for development guidelines
+3. Check existing [issues](https://github.com/your-repo/Multi-Agent-Intelligence/issues)
+4. Create a new issue with detailed information
+
+## Contributing
+
+We welcome contributions! Please follow these guidelines:
+
+### Development Process
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Make** your changes following our [code style](AGENTS.md)
+4. **Write** comprehensive tests
+5. **Run** the full test suite (`pytest`)
+6. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+7. **Push** to the branch (`git push origin feature/amazing-feature`)
+8. **Open** a Pull Request
+
+### Code Standards
+
+- Follow PEP 8 style guide
+- Use type hints for all functions
+- Write comprehensive docstrings
+- Maintain 100% test coverage
+- Run all linting tools before submitting
+
+### Testing Requirements
+
+- All new code must have corresponding tests
+- Tests must pass on all supported Python versions
+- Maintain or improve code coverage
+- Include integration tests for new features
+
+### Documentation
+
+- Update README.md for new features
+- Add docstrings to all public functions
+- Update API documentation if applicable
+- Include usage examples
 
 ## Project Structure
 
@@ -198,6 +653,8 @@ specify init --here --ai opencode --force
 │       └── user_api.py           # User Management API server
 │
 ├── 🎯 Examples & Demos
+│   ├── calculator.py             # Simple calculator example
+│   ├── circle_area.py            # Circle area calculation example
 │   ├── demos/
 │   │   ├── demo.py               # Main demo script
 │   │   ├── demo_agent_versioning.py # Agent versioning demo
@@ -248,7 +705,7 @@ specify init --here --ai opencode --force
 │
 ├── 🧪 Testing
 │   ├── testing/
-│   │   ├── test_*.py             # All unit test files (211 tests total, 100% pass)
+│   │   ├── test_*.py             # All unit test files (198 tests total, 100% pass)
 │   │   ├── test_user_api.py      # User API specific tests
 │   │   ├── TESTING.md            # Test suite documentation
 │   │   └── TEST_RESULTS.md       # Test results summary
@@ -261,125 +718,64 @@ specify init --here --ai opencode --force
 │   ├── MICROSOFT_COMPLIANCE.md   # Architecture compliance check
 │   └── USAGE_GUIDE.md            # Usage and deployment guide
 │
+├── 📝 Logs
+│   └── logs/
+│       ├── agent_system.log      # Main application logs
+│       ├── health_monitor.log    # Health monitoring logs
+│       └── api_access.log        # API access logs
+│
 └── ⚙️  Configuration
     ├── requirements.txt          # Python dependencies
+    ├── .env                      # Environment variables (create this)
+    ├── .env.example              # Environment variables template
     └── .gitignore               # Git ignore rules
 ```
 
-## Test Coverage Results
-
-| Component | Tests | Coverage |
-|-----------|-------|----------|
-| Intent Classifier | 16/16 | ✅ 100% |
-| Health Monitor | 22/22 | ✅ 100% |
-| Metrics System | 30/30 | ✅ 100% |
-| Token Tracker | 25/25 | ✅ 100% |
-| Agent Versioning | 25/25 | ✅ 100% |
-| MCP Protocol | 31/31 | ✅ 100% |
-| RBAC/Authentication | 29/29 | ✅ 100% |
-| System Integration | 20/20 | ✅ 100% |
-| **Total** | **198/198** | **100%** |
-
-All tests pass with comprehensive coverage including edge cases and error handling.
-
-## Best Practices
-
-See [AGENTS.md](AGENTS.md) for comprehensive guidelines on:
-- Code style and conventions
-- Agent development patterns
-- Testing strategies
-- Security and resilience
-- Architecture patterns
-
-## Observability & Monitoring
-
-### Health Monitor API
-
-```bash
-# Start health monitor server
-python health_monitor.py
-```
-
-Available endpoints:
-- `GET /health` - Overall system health
-- `GET /health/agents/{name}` - Specific agent health
-- `GET /status/all` - Current agent statuses
-- `GET /metrics` - System metrics summary
-
-### Metrics (Prometheus)
-
-```bash
-# Start metrics server
-python metrics.py
-```
-
-Metrics exposed at `http://localhost:8000/metrics`:
-- `agent_token_usage_total` - Token consumption per agent
-- `agent_calls_total` - Agent invocation count
-- `agent_latency_seconds` - Execution time histogram
-- `tool_calls_total` - Tool invocation count
-- `agent_errors_total` - Error rate tracking
-
-### Token Tracking
-
-```python
-from token_tracker import get_token_tracker
-
-tracker = get_token_tracker(daily_cost_limit=10.0)
-tracker.register_usage_callback(lambda record: print(f"Used {record.total_tokens} tokens"))
-
-# Get usage summary
-summary = tracker.get_session_summary()
-print(f"Total cost: ${summary['total_cost']:.2f}")
-```
-
-### MCP (Model Context Protocol)
-
-```bash
-# Access MCP tools programmatically
-from system_integration import get_system
-
-system = get_system()
-tools = system.get_mcp_tools()
-print(f"Available tools: {len(tools)}")
-
-# Invoke a tool
-import asyncio
-async def use_tool():
-    result = await system.invoke_mcp_tool("save_file", {
-        "filename": "example.py",
-        "code": "print('Hello, MCP!')"
-    })
-    print(f"Tool result: {result}")
-
-asyncio.run(use_tool())
-```
-
-MCP provides standardized tool interface with:
-- Tool discovery and metadata
-- Schema validation
-- Secure invocation
-- Execution tracking
-- Error handling
-
-## Security
-
-- JWT-based authentication with secure token management
-- Role-based access control (RBAC) with granular permissions
-- Input validation and sanitization
-- Prompt injection prevention
-- Audit logging and monitoring
-- Rate limiting and abuse detection
-- Token consumption monitoring
-- Account lockout protection
-
-**Roles & Permissions:**
-- **Admin**: Full system access, user management
-- **Developer**: Agent creation, tool access, monitoring
-- **Operator**: Agent deployment, system monitoring
-- **User**: Basic agent interaction
-- **Agent**: Inter-agent communication
-
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+```
+MIT License
+
+Copyright (c) 2024 Multi-Agent Intelligence Platform
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION_WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## Contact
+
+**Project Maintainers:**
+- Your Name - [your.email@example.com](mailto:your.email@example.com)
+- Team Member - [team@example.com](mailto:team@example.com)
+
+**Project Links:**
+- **Homepage**: https://github.com/your-repo/Multi-Agent-Intelligence
+- **Documentation**: https://github.com/your-repo/Multi-Agent-Intelligence/wiki
+- **Issues**: https://github.com/your-repo/Multi-Agent-Intelligence/issues
+- **Discussions**: https://github.com/your-repo/Multi-Agent-Intelligence/discussions
+
+**Community:**
+- Join our [Discord server](https://discord.gg/your-server)
+- Follow us on [Twitter](https://twitter.com/your-handle)
+- Subscribe to our [newsletter](https://newsletter.example.com)
+
+---
+
+*Built with ❤️ using LangGraph, LangChain, and Ollama*

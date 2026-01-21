@@ -5,7 +5,7 @@ FastAPI dependencies for JWT authentication and role-based access control,
 integrating with the existing auth_system and auth_middleware.
 """
 
-from typing import Optional, Callable
+from typing import Callable
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -14,7 +14,7 @@ from auth.auth_middleware import (
     AuthenticatedUser,
 )
 from auth_system import get_auth_manager, UserRole
-from auth.user_models import User, UserResponse
+from auth.user_models import User
 
 
 security = HTTPBearer()
@@ -39,7 +39,7 @@ async def get_current_user(
         # Use existing middleware to validate token and get user
         user = await base_get_current_user(credentials)
         return user
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",

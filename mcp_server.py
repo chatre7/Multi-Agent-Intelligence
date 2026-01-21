@@ -558,7 +558,7 @@ def _register_default_tools():
             tags=["search", "web", "documentation", "domain-specific"],
         )
 
-        print(f"✓ Web search tools registered with MCP Server")
+        print("✓ Web search tools registered with MCP Server")
 
     except ImportError as e:
         print(f"⚠️ Web search tools not available: {e}")

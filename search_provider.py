@@ -5,11 +5,8 @@ DuckDuckGo-based web search implementation with result formatting
 and error handling for the MCP tools.
 """
 
-import requests
 import logging
-from typing import List, Dict, Any, Optional
-from urllib.parse import urlencode
-import time
+from typing import List, Dict, Optional
 
 from search_cache import get_search_cache
 from search_cost_manager import get_search_cost_manager

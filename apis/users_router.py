@@ -6,13 +6,12 @@ with proper authentication, authorization, and validation.
 """
 
 import logging
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from auth.auth_dependencies import (
     get_current_user,
     require_admin,
-    require_ownership_or_admin,
     get_current_user_model,
     validate_user_exists,
 )
@@ -24,8 +23,6 @@ from auth.user_models import (
     UserResponse,
     UserRole,
     PaginatedResponse,
-    PaginationParams,
-    ErrorResponse,
     HealthResponse,
 )
 

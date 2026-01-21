@@ -7,13 +7,11 @@ extending the core agent capabilities with domain expertise.
 
 import asyncio
 import logging
-from typing import Dict, List, Any, Optional, Callable
-from datetime import datetime
+from typing import Dict, List, Any, Optional
 import json
 import re
 
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-from langchain_core.tools import tool
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 
 from database_manager import get_database_manager

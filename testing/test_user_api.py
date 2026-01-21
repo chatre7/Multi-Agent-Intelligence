@@ -7,20 +7,15 @@ Tests for models, authentication dependencies, and API endpoints.
 import pytest
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
-import json
 from unittest.mock import patch, MagicMock
 
 from apis.user_api import app
 from auth.user_models import (
     User,
     UserCreate,
-    UserUpdate,
     UserResponse,
     UserRole,
-    ErrorResponse,
-    HealthResponse,
 )
-from auth.auth_dependencies import get_current_user, require_role
 from auth.auth_service import get_user_service
 
 

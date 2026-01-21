@@ -11,7 +11,6 @@ from langchain_core.documents import Document
 
 from langchain_core.messages import (
     BaseMessage,
-    HumanMessage,
     SystemMessage,
     ToolMessage,
     AIMessage,
@@ -44,7 +43,7 @@ class MemoryManager:
     def __init__(self):
         try:
             self.embeddings = OllamaEmbeddings(model="nomic-embed-text")
-        except Exception as e:
+        except Exception:
             print("⚠️ Warning: 'nomic-embed-text' not found. Using default.")
             self.embeddings = OllamaEmbeddings(model="gpt-oss:120b-cloud")
 
@@ -77,11 +76,6 @@ brain = MemoryManager()
 from advanced_agents import (
     get_agent_registry as get_advanced_agent_registry,
     get_multi_agent_orchestrator,
-    CodeReviewAgent,
-    ResearchAgent,
-    DataAnalysisAgent,
-    DocumentationAgent,
-    DevOpsAgent,
 )
 
 # Get advanced agent registry and orchestrator
@@ -469,12 +463,12 @@ def supervisor_node(state: AgentState):
         orchestration_response = message_content.lower()
         if any(word in orchestration_response for word in ["error", "failed"]):
             print(
-                f"  🎭 [Supervisor] : Multi-agent orchestration failed, routing to Planner"
+                "  🎭 [Supervisor] : Multi-agent orchestration failed, routing to Planner"
             )
             return {"next_agent": "Planner"}
         else:
             print(
-                f"  🎭 [Supervisor] : Multi-agent orchestration complete, ready for next steps"
+                "  🎭 [Supervisor] : Multi-agent orchestration complete, ready for next steps"
             )
 
     return {"next_agent": next_speaker}
@@ -568,7 +562,6 @@ def coder_node(state: AgentState):
     # Check for SpecKit-generated specifications
     spec_content = ""
     try:
-        import os
         from pathlib import Path
 
         # Look for the most recent spec directory
@@ -657,7 +650,6 @@ def critic_node(state: AgentState):
     # Load SpecKit specifications for review criteria
     spec_criteria = ""
     try:
-        import os
         from pathlib import Path
 
         # Look for the most recent spec directory
@@ -759,7 +751,6 @@ def tester_node(state: AgentState):
     # Load testing criteria from specifications
     test_criteria = ""
     try:
-        import os
         from pathlib import Path
 
         # Look for the most recent spec directory
@@ -1708,7 +1699,7 @@ async def multi_agent_orchestration_node(state: AgentState, strategy: str):
                 synthesis = result.get("synthesis", {})
                 response_content += f"**Strategy**: Parallel processing across {len(result.get('agents_used', []))} agents\n"
                 response_content += (
-                    f"**Key Insights**:\n"
+                    "**Key Insights**:\n"
                     + "\n".join(
                         f"- {insight}"
                         for insight in synthesis.get("key_insights", [])[:3]
@@ -1716,7 +1707,7 @@ async def multi_agent_orchestration_node(state: AgentState, strategy: str):
                     + "\n\n"
                 )
                 response_content += (
-                    f"**Consolidated Recommendations**:\n"
+                    "**Consolidated Recommendations**:\n"
                     + "\n".join(
                         f"- {rec}"
                         for rec in synthesis.get("consolidated_recommendations", [])[:3]
