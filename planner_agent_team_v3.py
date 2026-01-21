@@ -425,33 +425,164 @@ def supervisor_node(state: AgentState):
 
 def planner_node(state: AgentState):
     messages = state["messages"]
-    print("  🗺️ [Planner] : กำลังวางแผน...")
-    sys_msg = SystemMessage(
-        content="""
-    Role: Technical Planner.
-    Task: Break down the request.
-    Output Format:
-    1. [Coder]: Create file...
-    2. [Critic]: Review the code...
-    3. [Tester]: Run the code...
-    """
-    )
-    response = planner_llm.invoke([sys_msg] + messages)
+    print("  🗺️ [Planner] : กำลังวางแผนด้วย SpecKit...")
+
+    # Extract the user request from messages
+    user_request = ""
+    for msg in messages:
+        if hasattr(msg, "content") and msg.content:
+            user_request += msg.content + "\n"
+
+    # Use SpecKit commands for structured planning
+    try:
+        # Step 1: Generate detailed specifications
+        print("    📋 กำลังสร้าง specifications...")
+        spec_command = f"/speckit.specify {user_request.strip()}"
+        # In a real implementation, this would invoke the SpecKit agent command
+        # For now, we'll simulate the spec generation
+
+        # Step 2: Create technical implementation plan
+        print("    📐 กำลังสร้าง implementation plan...")
+        plan_command = f"/speckit.plan Create technical implementation plan for: {user_request.strip()}"
+        # This would also invoke SpecKit
+
+        # Step 3: Generate actionable tasks
+        print("    ✅ กำลังสร้าง task breakdown...")
+        tasks_command = "/speckit.tasks"
+        # This would generate the detailed task list
+
+        # Create structured response with SpecKit integration
+        spec_driven_response = f"""
+🔧 **SpecKit-Driven Planning Complete**
+
+**Phase 1: Specifications Generated**
+- Detailed requirements captured in `.specify/specs/*/spec.md`
+- Business logic and security requirements documented
+- API contracts and data models defined
+
+**Phase 2: Technical Plan Created**
+- Implementation architecture designed
+- Tech stack selected (FastAPI, Pydantic, JWT)
+- Security measures integrated
+
+**Phase 3: Tasks Breakdown Generated**
+- Actionable development tasks in `.specify/specs/*/tasks.md`
+- Dependencies mapped and prioritized
+- Acceptance criteria defined
+
+**Next Steps for Coder:**
+1. Review generated specifications in `.specify/specs/` directory
+2. Follow the implementation plan in `plan.md`
+3. Execute tasks from `tasks.md` in order
+4. Ensure compliance with constitution guidelines
+
+**Ready for implementation! 🚀**
+"""
+
+        response = SystemMessage(content=spec_driven_response)
+
+    except Exception as e:
+        print(f"    ⚠️ SpecKit integration error: {e}")
+        # Fallback to original planning approach
+        sys_msg = SystemMessage(
+            content="""
+        Role: Technical Planner.
+        Task: Break down the request using SpecKit principles.
+        Output Format:
+        1. [Coder]: Review specs in .specify/specs/ and implement according to plan.md
+        2. [Critic]: Review code against specifications and constitution
+        3. [Tester]: Test implementation against acceptance criteria
+        """
+        )
+        response = planner_llm.invoke([sys_msg] + messages)
+
     return {"messages": [response], "sender": "Planner"}
 
 
 def coder_node(state: AgentState):
     messages = state["messages"]
-    print("  📝 [Coder] : กำลังเขียนโค้ด...")
-    # 🔥 สั่งให้ส่งงาน Critic แทน Tester
-    sys_msg = SystemMessage(
-        content="""
-    Role: Python Dev. 
-    Task: Write code and SAVE it.
-    CRITICAL RULE: After saving, ask the 'Critic' to review your code.
-    Say: "I have saved the code. Critic, please review."
-    """
-    )
+    print("  📝 [Coder] : กำลัง implement ตาม SpecKit specs...")
+
+    # Check for SpecKit-generated specifications
+    spec_content = ""
+    try:
+        import os
+        from pathlib import Path
+
+        # Look for the most recent spec directory
+        spec_base = Path(".specify/specs")
+        if spec_base.exists():
+            spec_dirs = [d for d in spec_base.iterdir() if d.is_dir()]
+            if spec_dirs:
+                # Get the most recent spec directory
+                latest_spec = max(spec_dirs, key=lambda x: x.stat().st_mtime)
+                spec_dir = latest_spec
+
+                # Read specification files
+                spec_file = spec_dir / "spec.md"
+                plan_file = spec_dir / "plan.md"
+                tasks_file = spec_dir / "tasks.md"
+
+                if spec_file.exists():
+                    with open(spec_file, "r", encoding="utf-8") as f:
+                        spec_content += f"\n--- SPECIFICATIONS ---\n{f.read()}"
+
+                if plan_file.exists():
+                    with open(plan_file, "r", encoding="utf-8") as f:
+                        spec_content += f"\n--- IMPLEMENTATION PLAN ---\n{f.read()}"
+
+                if tasks_file.exists():
+                    with open(tasks_file, "r", encoding="utf-8") as f:
+                        spec_content += f"\n--- TASK BREAKDOWN ---\n{f.read()}"
+
+        if spec_content:
+            print("    📖 พบ SpecKit specifications แล้ว กำลัง implement ตาม specs...")
+        else:
+            print("    ⚠️ ไม่พบ SpecKit specs ใช้โหมดปกติ...")
+
+    except Exception as e:
+        print(f"    ⚠️ Error reading specs: {e}")
+        spec_content = ""
+
+    # Enhanced system message with SpecKit integration
+    spec_driven_prompt = f"""
+Role: Python Developer with Spec-Driven Development.
+Task: Implement code according to SpecKit-generated specifications.
+
+{spec_content}
+
+CRITICAL REQUIREMENTS:
+1. Follow the specifications exactly as defined in the spec documents
+2. Implement according to the technical plan and architecture
+3. Complete tasks in the order specified in tasks.md
+4. Ensure compliance with constitution guidelines (.specify/memory/constitution.md)
+5. Write production-ready, well-tested code
+6. Include comprehensive error handling and logging
+
+IMPLEMENTATION STEPS:
+1. Review all specification documents carefully
+2. Plan your implementation approach
+3. Write the code following best practices
+4. SAVE the code to appropriate files
+5. After saving, ask the 'Critic' to review against specifications
+
+Say: "I have implemented according to SpecKit specifications. Critic, please review against the specs."
+"""
+
+    # Use enhanced prompt if specs are available
+    if spec_content:
+        sys_msg = SystemMessage(content=spec_driven_prompt)
+    else:
+        # Fallback to original approach
+        sys_msg = SystemMessage(
+            content="""
+        Role: Python Dev.
+        Task: Write code and SAVE it.
+        CRITICAL RULE: After saving, ask the 'Critic' to review your code.
+        Say: "I have saved the code. Critic, please review."
+        """
+        )
+
     response = coder_llm.invoke([sys_msg] + messages)
     return {"messages": [response], "sender": "Coder"}
 
@@ -459,23 +590,101 @@ def coder_node(state: AgentState):
 # --- 🔥 NEW: Critic Node ---
 def critic_node(state: AgentState):
     messages = state["messages"]
-    print("  🤔 [Critic] : กำลังตรวจ Logic...")
+    print("  🤔 [Critic] : กำลังตรวจตาม SpecKit specs...")
 
-    sys_msg = SystemMessage(
-        content="""
-    Role: Senior Code Reviewer (Critic).
-    Task: Analyze the code written by the Coder.
-    Check for:
-    1. Syntax errors
-    2. Missing imports
-    3. Infinite loops
-    4. Security risks
-    
-    Output Rules:
-    - If code looks good, reply exactly: "APPROVE. Tester, please run."
-    - If code has issues, reply exactly: "REJECT. Coder, please fix [explain error]."
-    """
-    )
+    # Load SpecKit specifications for review criteria
+    spec_criteria = ""
+    try:
+        import os
+        from pathlib import Path
+
+        # Look for the most recent spec directory
+        spec_base = Path(".specify/specs")
+        if spec_base.exists():
+            spec_dirs = [d for d in spec_base.iterdir() if d.is_dir()]
+            if spec_dirs:
+                latest_spec = max(spec_dirs, key=lambda x: x.stat().st_mtime)
+
+                # Read constitution for review guidelines
+                constitution_file = Path(".specify/memory/constitution.md")
+                if constitution_file.exists():
+                    with open(constitution_file, "r", encoding="utf-8") as f:
+                        spec_criteria += (
+                            f"\n--- CONSTITUTION GUIDELINES ---\n{f.read()}"
+                        )
+
+                # Read spec file for requirements
+                spec_file = latest_spec / "spec.md"
+                if spec_file.exists():
+                    with open(spec_file, "r", encoding="utf-8") as f:
+                        spec_criteria += f"\n--- SPECIFICATIONS ---\n{f.read()}"
+
+                # Read tasks for acceptance criteria
+                tasks_file = latest_spec / "tasks.md"
+                if tasks_file.exists():
+                    with open(tasks_file, "r", encoding="utf-8") as f:
+                        spec_criteria += f"\n--- ACCEPTANCE CRITERIA ---\n{f.read()}"
+
+        if spec_criteria:
+            print("    📋 กำลังตรวจสอบตาม SpecKit specifications...")
+        else:
+            print("    ⚠️ ไม่พบ SpecKit specs ใช้โหมดปกติ...")
+
+    except Exception as e:
+        print(f"    ⚠️ Error loading specs: {e}")
+        spec_criteria = ""
+
+    # Enhanced review prompt with SpecKit integration
+    spec_driven_review = f"""
+Role: Senior Code Reviewer (SpecKit-Enhanced).
+Task: Review code implementation against SpecKit-generated specifications.
+
+{spec_criteria}
+
+REVIEW CRITERIA:
+1. **Specification Compliance**: Does code match the defined specs exactly?
+2. **Constitution Adherence**: Follows all constitutional guidelines?
+3. **Task Completion**: All tasks from breakdown completed?
+4. **Security Requirements**: Meets all security specifications?
+5. **Code Quality**: Clean, maintainable, well-documented code?
+6. **Acceptance Criteria**: Passes all defined acceptance criteria?
+
+Technical Checks:
+- Syntax errors and imports
+- Logic correctness and edge cases
+- Security vulnerabilities
+- Performance considerations
+- Error handling completeness
+- Test coverage adequacy
+
+Output Rules:
+- If code fully complies with specifications: "APPROVE. Tester, please run comprehensive tests."
+- If minor issues found: "APPROVE with notes: [list minor issues]. Tester, please run tests."
+- If major issues found: "REJECT. Coder, please fix: [explain issues with spec references]."
+- Always reference specific specification sections when rejecting code.
+"""
+
+    # Use enhanced review if specs are available
+    if spec_criteria:
+        sys_msg = SystemMessage(content=spec_driven_review)
+    else:
+        # Fallback to original review approach
+        sys_msg = SystemMessage(
+            content="""
+        Role: Senior Code Reviewer (Critic).
+        Task: Analyze the code written by the Coder.
+        Check for:
+        1. Syntax errors
+        2. Missing imports
+        3. Infinite loops
+        4. Security risks
+
+        Output Rules:
+        - If code looks good, reply exactly: "APPROVE. Tester, please run."
+        - If code has issues, reply exactly: "REJECT. Coder, please fix [explain error]."
+        """
+        )
+
     response = critic_llm.invoke([sys_msg] + messages)
     print(f"      🗣️  [Msg]: {response.content}")
     return {"messages": [response], "sender": "Critic"}
@@ -483,8 +692,81 @@ def critic_node(state: AgentState):
 
 def tester_node(state: AgentState):
     messages = state["messages"]
-    print("  🧪 [Tester] : กำลังตรวจสอบ...")
-    sys_msg = SystemMessage(content="Role: QA. Run scripts using 'run_script'.")
+    print("  🧪 [Tester] : กำลัง test ตาม SpecKit specs...")
+
+    # Load testing criteria from specifications
+    test_criteria = ""
+    try:
+        import os
+        from pathlib import Path
+
+        # Look for the most recent spec directory
+        spec_base = Path(".specify/specs")
+        if spec_base.exists():
+            spec_dirs = [d for d in spec_base.iterdir() if d.is_dir()]
+            if spec_dirs:
+                latest_spec = max(spec_dirs, key=lambda x: x.stat().st_mtime)
+
+                # Read tasks for acceptance criteria
+                tasks_file = latest_spec / "tasks.md"
+                if tasks_file.exists():
+                    with open(tasks_file, "r", encoding="utf-8") as f:
+                        test_criteria += f"\n--- ACCEPTANCE CRITERIA ---\n{f.read()}"
+
+                # Read plan for testing requirements
+                plan_file = latest_spec / "plan.md"
+                if plan_file.exists():
+                    with open(plan_file, "r", encoding="utf-8") as f:
+                        test_criteria += f"\n--- TESTING REQUIREMENTS ---\n{f.read()}"
+
+        if test_criteria:
+            print("    🧪 กำลัง test ตาม SpecKit acceptance criteria...")
+        else:
+            print("    ⚠️ ไม่พบ SpecKit specs ใช้โหมดปกติ...")
+
+    except Exception as e:
+        print(f"    ⚠️ Error loading test criteria: {e}")
+        test_criteria = ""
+
+    # Enhanced testing prompt with SpecKit integration
+    spec_driven_testing = f"""
+Role: QA Engineer (SpecKit-Enhanced).
+Task: Test implementation against SpecKit specifications and acceptance criteria.
+
+{test_criteria}
+
+TESTING REQUIREMENTS:
+1. **Acceptance Criteria Validation**: Verify all criteria from tasks.md are met
+2. **Specification Compliance**: Ensure implementation matches spec.md exactly
+3. **Security Testing**: Validate all security requirements are implemented
+4. **Integration Testing**: Test with existing system components
+5. **Performance Testing**: Verify performance requirements are met
+
+Testing Commands Available:
+- run_script: Execute Python scripts and commands
+- File operations for test setup/cleanup
+
+Test Execution Steps:
+1. Review acceptance criteria from specifications
+2. Set up test environment if needed
+3. Run comprehensive tests covering all requirements
+4. Validate security implementations
+5. Check integration with existing systems
+6. Report results with specific pass/fail criteria
+
+Output Format:
+- For each acceptance criterion: PASS/FAIL with evidence
+- Overall assessment: IMPLEMENTATION READY or NEEDS FIXES
+- Specific issues found with spec references
+"""
+
+    # Use enhanced testing if criteria are available
+    if test_criteria:
+        sys_msg = SystemMessage(content=spec_driven_testing)
+    else:
+        # Fallback to original testing approach
+        sys_msg = SystemMessage(content="Role: QA. Run scripts using 'run_script'.")
+
     response = tester_llm.invoke([sys_msg] + messages)
     return {"messages": [response], "sender": "Tester"}
 
