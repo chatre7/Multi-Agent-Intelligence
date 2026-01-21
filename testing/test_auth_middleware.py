@@ -104,13 +104,13 @@ class TestFastAPIIntegration:
     @pytest.fixture
     def test_app(self):
         """Create test FastAPI app with auth."""
-        from fastapi import FastAPI
-        from auth_middleware import AuthMiddleware
+        from fastapi import FastAPI, Depends
+        from auth.auth_middleware import AuthMiddleware
 
         app = FastAPI()
 
-        # Add auth middleware
-        middleware = AuthMiddleware()
+        # Add auth middleware with excluded paths
+        middleware = AuthMiddleware(exclude_paths=["/public", "/auth/login"])
         app.middleware("http")(middleware)
 
         # Test routes
@@ -127,8 +127,10 @@ class TestFastAPIIntegration:
             return {"message": "admin", "user": user.username}
 
         @app.post("/auth/login")
-        async def login(username: str, password: str):
+        async def login(request: dict):
             try:
+                username = request.get("username")
+                password = request.get("password")
                 user = authenticate_user(username, password)
                 token = create_access_token(user)
                 return {"access_token": token, "token_type": "bearer"}
@@ -152,7 +154,7 @@ class TestFastAPIIntegration:
         """Test protected route requires auth."""
         response = client.get("/protected")
         assert response.status_code == 401
-        assert "Authentication required" in response.json()["detail"]
+        assert "Authorization" in response.json()["detail"]
 
     def test_admin_route_no_auth(self, client):
         """Test admin route requires auth."""

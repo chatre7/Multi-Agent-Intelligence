@@ -268,7 +268,7 @@ class TestGetHealthMonitor:
 
     def test_get_monitor_creates_instance(self):
         """Test get_health_monitor creates new instance."""
-        from health_monitor import _monitor
+        from monitoring.health_monitor import _monitor
 
         _monitor = None
         monitor = get_health_monitor()

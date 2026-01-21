@@ -319,7 +319,7 @@ class TestGetTokenTracker:
 
     def test_get_tracker_creates_instance(self):
         """Test get_token_tracker creates new instance."""
-        from token_tracker import _tracker
+        from monitoring.token_tracker import _tracker
 
         _tracker = None
         tracker = get_token_tracker()
