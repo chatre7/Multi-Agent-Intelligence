@@ -513,19 +513,24 @@ def supervisor_node(state: AgentState):
     ]
 
     if sender in specialized_agents:
-        # Specialized agents have completed their analysis, route back to supervisor
-        # or continue with appropriate next steps based on the analysis
-        agent_response = message_content.lower()
-        if any(word in agent_response for word in ["error", "failed", "unable"]):
-            print(
-                f"  🔬 [Supervisor] : {sender} encountered issues, routing to Planner for assistance"
-            )
+        # Check response structure to distinguish actual errors from technical content
+        # Specialized agents use structured format: "🔬 **AgentName Analysis Complete**" for success
+        # and "❌ **AgentName Error**" for actual failures
+
+        if f"🔬 **{sender} Analysis Complete**" in message_content:
+            # Successful completion with analysis
+            print(f"  🔬 [Supervisor] : {sender} analysis complete, task finished")
+            return {"next_agent": "FINISH"}  # Complete the conversation
+
+        elif f"❌ **{sender} Error**" in message_content:
+            # Actual error from agent - route to Planner for help
+            print(f"  🔬 [Supervisor] : {sender} encountered actual error, routing to Planner")
             return {"next_agent": "Planner"}
+
         else:
-            print(
-                f"  🔬 [Supervisor] : {sender} analysis complete, task ready for next steps"
-            )
-            # Could route to DevTeam for implementation or keep with supervisor for user decision
+            # Fallback: treat as completion
+            print(f"  🔬 [Supervisor] : {sender} response received, completing task")
+            return {"next_agent": "FINISH"}
 
     # Handle multi-agent orchestration responses
     if sender.startswith("MultiAgent_"):
