@@ -477,6 +477,11 @@ def supervisor_node(state: AgentState):
     message_content = str(last_message.content)
     next_speaker = router.get_next_speaker(sender, message_content, conversation_state)
 
+    # Prevent infinite loop: supervisor should not route to itself from user messages
+    if next_speaker == "supervisor" and sender == "User":
+        print("  ⚠️ [Supervisor] : Preventing self-loop, routing to Planner")
+        next_speaker = "Planner"
+
     # Check for termination conditions
     if router.should_terminate(message_content, conversation_state["iteration_count"]):
         print("  🎯 [Supervisor] : Conversation complete!")
@@ -1902,6 +1907,7 @@ workflow.add_conditional_edges(
     "supervisor",
     advanced_dynamic_route,
     {
+        "supervisor": "supervisor",  # Allow supervisor to loop back to itself
         "Planner": "Planner",
         "DevTeam": "DevTeam",
         "tools": "tools",
