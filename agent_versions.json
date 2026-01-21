@@ -1,0 +1,107 @@
+{
+  "Planner": {
+    "1.0.0": {
+      "agent_name": "Planner",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T02:41:48.856872",
+      "updated_at": "2026-01-21T02:41:48.856872",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "Expert strategist. Breaks down complex tasks.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  },
+  "Coder": {
+    "1.0.0": {
+      "agent_name": "Coder",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T02:41:48.856872",
+      "updated_at": "2026-01-21T02:41:48.856872",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "Writes code and SAVES files.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  },
+  "Critic": {
+    "1.0.0": {
+      "agent_name": "Critic",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T02:41:48.856872",
+      "updated_at": "2026-01-21T02:41:48.856872",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "Reviews code logic and quality BEFORE testing.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  },
+  "Tester": {
+    "1.0.0": {
+      "agent_name": "Tester",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T02:41:48.856872",
+      "updated_at": "2026-01-21T02:41:48.856872",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "Runs scripts and validates output.",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  },
+  "Reviewer": {
+    "1.0.0": {
+      "agent_name": "Reviewer",
+      "version": "1.0.0",
+      "state": "dev",
+      "created_at": "2026-01-21T02:41:48.856872",
+      "updated_at": "2026-01-21T02:41:48.856872",
+      "promoted_at": null,
+      "deprecated_at": null,
+      "archived_at": null,
+      "author": "system",
+      "description": "General reviewer (Final check).",
+      "dependencies": [],
+      "test_results": {},
+      "performance_metrics": {},
+      "security_scan_results": {},
+      "dev_config": {},
+      "test_config": {},
+      "prod_config": {}
+    }
+  }
+}

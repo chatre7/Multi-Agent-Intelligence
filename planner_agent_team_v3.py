@@ -2,7 +2,7 @@ import operator
 import subprocess
 import os
 import sqlite3
-from typing import Annotated, Sequence, TypedDict, Dict
+from typing import Annotated, Sequence, TypedDict, Dict, Optional
 
 # Memory Dependencies
 from langchain_chroma import Chroma
@@ -28,6 +28,10 @@ from mcp_client import get_mcp_client
 
 # Agent Versioning
 from agent_versioning import get_version_manager, TransitionAction
+
+# Hierarchical Chat / Subgraphs Support
+from langgraph.graph import StateGraph as SubgraphStateGraph
+from typing import Literal
 
 
 # ==========================================
@@ -348,10 +352,15 @@ planner_llm = llm
 
 
 def supervisor_node(state: AgentState):
+    """
+    Hierarchical Supervisor: Makes high-level decisions and delegates to teams.
+    Instead of managing individual agents, now delegates to Planner or DevTeam.
+    """
     messages = state["messages"]
     last_message = messages[-1]
     sender = state.get("sender", "User")
 
+    # Handle tool calls and responses
     if isinstance(last_message, AIMessage) and last_message.tool_calls:
         return {"next_agent": "tools"}
     if isinstance(last_message, ToolMessage):
@@ -359,41 +368,105 @@ def supervisor_node(state: AgentState):
 
     content = last_message.content.lower()
 
-    # 🔥 Smart Handoff Updated:
-    # ถ้า Critic บอกว่า APPROVE -> ให้ส่งไป Tester
-    if sender == "Critic" and "approve" in content:
-        print("  🛡️ [Supervisor] : Critic Approved -> Sending to Tester")
-        return {"next_agent": "Tester"}
+    # 🚀 Hierarchical Decision Making:
+    # Instead of routing to individual agents, decide between:
+    # - Planner: For planning and analysis tasks
+    # - DevTeam: For development, coding, testing tasks
 
-    # ถ้า Critic บอกว่า REJECT -> ส่งกลับไป Coder (Loop correction)
-    if sender == "Critic" and "reject" in content:
-        print("  🛡️ [Supervisor] : Critic Rejected -> Sending back to Coder")
-        return {"next_agent": "Coder"}
+    # Handle DevTeam responses (simplified reporting)
+    if sender == "DevTeam":
+        dev_team_response = str(last_message.content).lower()
+        if any(
+            word in dev_team_response
+            for word in ["completed", "เสร็จ", "success", "done"]
+        ):
+            print("  🏢 [Supervisor] : DevTeam reported completion -> Task finished!")
+            return {"next_agent": "FINISH"}
+        elif any(word in dev_team_response for word in ["failed", "error", "ปัญหา"]):
+            print(
+                "  🏢 [Supervisor] : DevTeam reported issues -> Sending back for fixes"
+            )
+            return {"next_agent": "DevTeam"}  # Re-delegate to DevTeam
+        else:
+            # DevTeam still working, keep them going
+            return {"next_agent": "DevTeam"}
 
-    # Universal Guard
-    if "tester" in content and "run" in content:
-        return {"next_agent": "Tester"}
-
+    # Initial user request analysis (Hierarchical approach)
     if isinstance(last_message, HumanMessage):
+        # Complex planning tasks -> Planner
         if any(
             w in content
-            for w in ["save", "code", "write", "create", "สร้าง", "เขียน", "บันทึก"]
+            for w in [
+                "plan",
+                "design",
+                "architecture",
+                "strategy",
+                "analyze",
+                "วางแผน",
+                "ออกแบบ",
+                "วิเคราะห์",
+                "ระบบ",
+                "โครงสร้าง",
+            ]
         ):
-            return {"next_agent": "Coder"}
-        if any(w in content for w in ["test", "run", "รัน", "ตรวจสอบ"]):
-            return {"next_agent": "Tester"}
+            print("  🏢 [Supervisor] : Complex task detected -> Delegating to Planner")
+            return {"next_agent": "Planner"}
 
-    # AI Router
+        # Development/implementation tasks -> DevTeam
+        if any(
+            w in content
+            for w in [
+                "code",
+                "implement",
+                "create",
+                "build",
+                "develop",
+                "write",
+                "เขียน",
+                "สร้าง",
+                "พัฒนา",
+                "โค้ด",
+                "ฟีเจอร์",
+                "feature",
+            ]
+        ):
+            print(
+                "  🏢 [Supervisor] : Development task detected -> Delegating to DevTeam"
+            )
+            return {"next_agent": "DevTeam"}
+
+        # Testing/debugging tasks -> DevTeam
+        if any(
+            w in content
+            for w in [
+                "test",
+                "debug",
+                "fix",
+                "run",
+                "check",
+                "validate",
+                "ทดสอบ",
+                "แก้ไข",
+                "รัน",
+                "ตรวจสอบ",
+                "validate",
+            ]
+        ):
+            print("  🏢 [Supervisor] : Testing task detected -> Delegating to DevTeam")
+            return {"next_agent": "DevTeam"}
+
+    # AI-powered hierarchical routing for complex decisions
     system_prompt = (
-        "You are the Supervisor. Who should act next?\n"
-        "Options: [Planner, Coder, Critic, Tester, FINISH].\n"
-        "Rules:\n"
-        "- New complex task -> Planner\n"
-        "- Coding -> Coder\n"
-        "- Reviewing Code Logic -> Critic (Use this before Testing!)\n"
-        "- Running Code -> Tester\n"
-        "- Task done -> FINISH\n"
-        "Reply with JUST THE AGENT NAME."
+        "You are the CEO Supervisor in a hierarchical organization.\n"
+        "Your role is to delegate high-level tasks to appropriate teams, not micromanage.\n\n"
+        "Decision Framework:\n"
+        "- STRATEGIC PLANNING (market analysis, architecture design) → Planner\n"
+        "- DEVELOPMENT WORK (coding, testing, debugging) → DevTeam\n"
+        "- COMPLEX ANALYSIS (requirements gathering, tech evaluation) → Planner\n"
+        "- IMPLEMENTATION (feature building, bug fixing) → DevTeam\n\n"
+        "Current Context: DevTeam handles coding/testing autonomously.\n"
+        "You receive summarized reports, not technical details.\n\n"
+        "Respond with JUST ONE WORD: Planner, DevTeam, or FINISH"
     )
 
     next_node = "FINISH"
@@ -451,32 +524,29 @@ def planner_node(state: AgentState):
         tasks_command = "/speckit.tasks"
         # This would generate the detailed task list
 
-        # Create structured response with SpecKit integration
-        spec_driven_response = f"""
-🔧 **SpecKit-Driven Planning Complete**
+        # Create hierarchical response - delegate to DevTeam
+        hierarchical_response = f"""
+🏗️ **Strategic Planning Complete - Delegating to DevTeam**
 
-**Phase 1: Specifications Generated**
-- Detailed requirements captured in `.specify/specs/*/spec.md`
-- Business logic and security requirements documented
-- API contracts and data models defined
+**Planning Summary:**
+- **Objective**: {user_request.strip()}
+- **Approach**: SpecKit-driven development with quality assurance
+- **Architecture**: Modular, scalable implementation
+- **Quality Gates**: Automated testing, code review, security validation
 
-**Phase 2: Technical Plan Created**
-- Implementation architecture designed
-- Tech stack selected (FastAPI, Pydantic, JWT)
-- Security measures integrated
+**DevTeam Brief:**
+"Implement the planned feature following these specifications:
+1. Review detailed requirements in `.specify/specs/` directory
+2. Execute implementation according to technical plan
+3. Complete all acceptance criteria with 100% test coverage
+4. Report back only when fully complete and tested
 
-**Phase 3: Tasks Breakdown Generated**
-- Actionable development tasks in `.specify/specs/*/tasks.md`
-- Dependencies mapped and prioritized
-- Acceptance criteria defined
+The DevTeam has full autonomy to iterate internally until completion."
 
-**Next Steps for Coder:**
-1. Review generated specifications in `.specify/specs/` directory
-2. Follow the implementation plan in `plan.md`
-3. Execute tasks from `tasks.md` in order
-4. Ensure compliance with constitution guidelines
+**Supervisor**: DevTeam will handle all development work autonomously.
+You will receive summarized status reports, not technical details.
 
-**Ready for implementation! 🚀**
+**Ready for DevTeam execution! 🚀**
 """
 
         response = SystemMessage(content=spec_driven_response)
@@ -781,18 +851,324 @@ tool_node = ToolNode(
 )
 
 # ==========================================
+# 4. HIERARCHICAL CHAT / DEVTEAM SUBGRAPH
+# ==========================================
+
+
+# DevTeam Subgraph State
+class DevTeamState(TypedDict):
+    """State for the DevTeam subgraph with internal communication"""
+
+    messages: Annotated[Sequence, operator.add]
+    sender: str
+    task_summary: str  # Summary of the task from Supervisor
+    iteration_count: int  # Track internal iterations
+    dev_status: Literal[
+        "planning", "coding", "reviewing", "testing", "completed", "failed"
+    ]
+    final_result: Optional[str]  # Final deliverable to send back to Supervisor
+
+
+def dev_team_coordinator(state: DevTeamState) -> DevTeamState:
+    """
+    Internal coordinator for the DevTeam subgraph.
+    Manages the flow between Coder, Critic, and Tester.
+    """
+    messages = state["messages"]
+    iteration_count = state.get("iteration_count", 0)
+
+    print(f"  👥 [DevTeam] Iteration {iteration_count + 1} - กำลังประสานงานภายในทีม...")
+
+    # Analyze the latest message to determine next action
+    if not messages:
+        return {
+            "messages": [
+                SystemMessage(
+                    content="DevTeam initialized and ready for task assignment."
+                )
+            ],
+            "sender": "DevTeam_Coordinator",
+            "dev_status": "planning",
+            "iteration_count": iteration_count + 1,
+        }
+
+    latest_message = messages[-1]
+
+    # Decision logic based on message content and current status
+    current_status = state.get("dev_status", "planning")
+
+    # If this is the first task assignment from Supervisor
+    if current_status == "planning" and "supervisor" in str(latest_message).lower():
+        return {
+            "messages": [
+                SystemMessage(content="Task received. Starting development process.")
+            ],
+            "sender": "DevTeam_Coordinator",
+            "dev_status": "coding",
+        }
+
+    # Analyze message content for routing decisions
+    message_text = (
+        str(latest_message.content).lower()
+        if hasattr(latest_message, "content")
+        else str(latest_message)
+    )
+
+    # Success indicators
+    if any(
+        word in message_text
+        for word in ["approved", "complete", "passed", "success", "เสร็จ"]
+    ):
+        return {
+            "messages": [
+                SystemMessage(
+                    content="🎉 Development completed successfully! Ready to report back to Supervisor."
+                )
+            ],
+            "sender": "DevTeam_Coordinator",
+            "dev_status": "completed",
+            "final_result": "Task completed successfully. All tests passed and code is approved.",
+        }
+
+    # Error indicators - route back to coding
+    if any(word in message_text for word in ["error", "fail", "bug", "fix", "แก้ไข"]):
+        return {
+            "messages": [
+                SystemMessage(
+                    content="Issues detected. Routing back to Coder for fixes."
+                )
+            ],
+            "sender": "DevTeam_Coordinator",
+            "dev_status": "coding",
+        }
+
+    # Default progression through the development cycle
+    if current_status == "coding":
+        next_status = "reviewing"
+        next_message = "Code submitted. Sending to Critic for review."
+    elif current_status == "reviewing":
+        next_status = "testing"
+        next_message = "Review completed. Sending to Tester for validation."
+    elif current_status == "testing":
+        next_status = "coding"  # Loop back if more work needed
+        next_message = "Testing completed. May need additional development iterations."
+    else:
+        next_status = "coding"
+        next_message = "Continuing development process."
+
+    return {
+        "messages": [SystemMessage(content=next_message)],
+        "sender": "DevTeam_Coordinator",
+        "dev_status": next_status,
+        "iteration_count": iteration_count + 1,
+    }
+
+
+def dev_team_coder_node(state: DevTeamState) -> DevTeamState:
+    """Enhanced Coder node for DevTeam subgraph"""
+    messages = state["messages"]
+    task_summary = state.get("task_summary", "")
+
+    print("    📝 [DevTeam:Coder] กำลังพัฒนาโค้ด...")
+
+    # Enhanced prompt with task context
+    dev_team_prompt = f"""
+Role: Senior Developer in DevTeam.
+Task: Implement the required feature as part of the development team.
+
+Task Summary: {task_summary}
+
+Guidelines:
+1. Focus on clean, maintainable code
+2. Follow existing project patterns and conventions
+3. Consider scalability and error handling
+4. Save code to appropriate files
+5. Prepare for review and testing
+
+After implementation, the code will be reviewed by Critic and tested by Tester.
+Provide a clear summary of what was implemented.
+"""
+
+    # Use enhanced prompt if task context is available
+    if task_summary:
+        sys_msg = SystemMessage(content=dev_team_prompt)
+    else:
+        # Fallback to original approach
+        sys_msg = SystemMessage(
+            content="""
+    Role: Python Dev in DevTeam.
+    Task: Write code and SAVE it.
+    After saving, prepare summary for team review.
+    """
+        )
+
+    response = coder_llm.invoke([sys_msg] + messages)
+    return {"messages": [response], "sender": "DevTeam_Coder", "dev_status": "coding"}
+
+
+def dev_team_critic_node(state: DevTeamState) -> DevTeamState:
+    """Enhanced Critic node for DevTeam subgraph"""
+    messages = state["messages"]
+
+    print("    🤔 [DevTeam:Critic] กำลังตรวจสอบโค้ด...")
+
+    dev_team_review_prompt = """
+Role: Senior Code Reviewer in DevTeam.
+Task: Review code implementation for quality, correctness, and adherence to standards.
+
+Focus Areas:
+1. Code correctness and logic
+2. Security vulnerabilities
+3. Performance considerations
+4. Code style and maintainability
+5. Testability
+
+Output Rules:
+- If code meets standards: "APPROVED. Ready for testing."
+- If minor issues: "APPROVED with notes: [list issues]. Proceed to testing."
+- If major issues: "REJECTED. [Coder]: Please fix: [explain issues]"
+"""
+
+    sys_msg = SystemMessage(content=dev_team_review_prompt)
+    response = critic_llm.invoke([sys_msg] + messages)
+
+    return {
+        "messages": [response],
+        "sender": "DevTeam_Critic",
+        "dev_status": "reviewing",
+    }
+
+
+def dev_team_tester_node(state: DevTeamState) -> DevTeamState:
+    """Enhanced Tester node for DevTeam subgraph"""
+    messages = state["messages"]
+
+    print("    🧪 [DevTeam:Tester] กำลังทดสอบโค้ด...")
+
+    dev_team_test_prompt = """
+Role: QA Engineer in DevTeam.
+Task: Test the implemented code for functionality, edge cases, and integration.
+
+Testing Focus:
+1. Functional correctness
+2. Error handling
+3. Integration with existing systems
+4. Performance validation
+5. Edge cases and boundary conditions
+
+Output Rules:
+- If all tests pass: "TESTS PASSED. Implementation ready."
+- If minor issues: "TESTS PASSED with notes: [list issues]. Implementation acceptable."
+- If major issues: "TESTS FAILED. [Coder]: Please fix: [explain issues]"
+"""
+
+    sys_msg = SystemMessage(content=dev_team_test_prompt)
+    response = tester_llm.invoke([sys_msg] + messages)
+
+    return {"messages": [response], "sender": "DevTeam_Tester", "dev_status": "testing"}
+
+
+# Create DevTeam Subgraph
+def create_dev_team_subgraph():
+    """Create the DevTeam subgraph with autonomous agent collaboration"""
+
+    dev_team_workflow = SubgraphStateGraph(DevTeamState)
+
+    # Add nodes
+    dev_team_workflow.add_node("coordinator", dev_team_coordinator)
+    dev_team_workflow.add_node("coder", dev_team_coder_node)
+    dev_team_workflow.add_node("critic", dev_team_critic_node)
+    dev_team_workflow.add_node("tester", dev_team_tester_node)
+
+    # Set entry point
+    dev_team_workflow.set_entry_point("coordinator")
+
+    # Define the development workflow
+    def route_after_coordinator(state: DevTeamState):
+        """Route based on coordinator's decision"""
+        dev_status = state.get("dev_status", "planning")
+
+        if dev_status == "completed":
+            return "end"  # Exit subgraph
+        elif dev_status == "failed":
+            return "end"  # Exit subgraph
+        elif dev_status == "coding":
+            return "coder"
+        elif dev_status == "reviewing":
+            return "critic"
+        elif dev_status == "testing":
+            return "tester"
+        else:
+            return "coder"  # Default to coding
+
+    def route_after_coder(state: DevTeamState):
+        """Always go to critic after coding"""
+        return "critic"
+
+    def route_after_critic(state: DevTeamState):
+        """Route based on critic's decision"""
+        messages = state.get("messages", [])
+        if not messages:
+            return "tester"  # Default
+
+        latest_message = str(messages[-1].content).lower()
+        if "rejected" in latest_message or "fix" in latest_message:
+            return "coder"  # Send back to coder
+        else:
+            return "tester"  # Proceed to testing
+
+    def route_after_tester(state: DevTeamState):
+        """Route based on tester's decision"""
+        messages = state.get("messages", [])
+        if not messages:
+            return "coordinator"  # Default
+
+        latest_message = str(messages[-1].content).lower()
+        if "failed" in latest_message or "fix" in latest_message:
+            return "coder"  # Send back to coder
+        else:
+            return "coordinator"  # Report back to coordinator
+
+    # Add conditional edges
+    dev_team_workflow.add_conditional_edges(
+        "coordinator",
+        route_after_coordinator,
+        {"coder": "coder", "critic": "critic", "tester": "tester", "end": END},
+    )
+
+    dev_team_workflow.add_edge("coder", "critic")
+    dev_team_workflow.add_conditional_edges("critic", route_after_critic)
+    dev_team_workflow.add_conditional_edges("tester", route_after_tester)
+
+    return dev_team_workflow.compile()
+
+
+# Global DevTeam subgraph instance
+_dev_team_subgraph = None
+
+
+def get_dev_team_subgraph():
+    """Get or create the DevTeam subgraph instance"""
+    global _dev_team_subgraph
+    if _dev_team_subgraph is None:
+        _dev_team_subgraph = create_dev_team_subgraph()
+    return _dev_team_subgraph
+
+
+# ==========================================
 # 5. GRAPH BUILD
 # ==========================================
 db_path = "checkpoints.db"
 conn = sqlite3.connect(db_path, check_same_thread=False)
 memory = SqliteSaver(conn)
 
+# Create hierarchical workflow with DevTeam subgraph
 workflow = StateGraph(AgentState)
 workflow.add_node("supervisor", supervisor_node)
 workflow.add_node("Planner", planner_node)
-workflow.add_node("Coder", coder_node)
-workflow.add_node("Critic", critic_node)  # ✅ เพิ่ม Node
-workflow.add_node("Tester", tester_node)
+workflow.add_node(
+    "DevTeam", get_dev_team_subgraph()
+)  # 🚀 Hierarchical: DevTeam subgraph
 workflow.add_node("tools", tool_node)
 
 workflow.set_entry_point("supervisor")
@@ -801,18 +1177,16 @@ workflow.add_conditional_edges(
     lambda x: x["next_agent"],
     {
         "Planner": "Planner",
-        "Coder": "Coder",
-        "Critic": "Critic",
-        "Tester": "Tester",
+        "DevTeam": "DevTeam",  # 🚀 Route to DevTeam subgraph instead of individual agents
         "tools": "tools",
         "FINISH": END,
     },
 )
 
 workflow.add_edge("Planner", "supervisor")
-workflow.add_edge("Coder", "supervisor")
-workflow.add_edge("Critic", "supervisor")  # ✅ เพิ่ม Edge
-workflow.add_edge("Tester", "supervisor")
+workflow.add_edge(
+    "DevTeam", "supervisor"
+)  # 🚀 DevTeam subgraph reports back to supervisor
 workflow.add_edge("tools", "supervisor")
 
 app = workflow.compile(checkpointer=memory, interrupt_before=["tools"])
