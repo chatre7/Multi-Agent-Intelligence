@@ -192,39 +192,67 @@ specify init --here --ai opencode --force
 
 ```
 .
-├── app.py                      # Streamlit web interface
-├── planner_agent_team_v3.py   # Core agent system with orchestrator
-├── intent_classifier.py         # Separate intent classification component
-├── health_monitor.py           # Health check system with FastAPI
-├── metrics.py                 # Prometheus metrics integration
-├── token_tracker.py           # Token consumption and cost tracking
-├── agent_versioning.py        # Agent versioning state machine
-├── auth_system.py             # RBAC authentication system
-├── auth_middleware.py         # FastAPI auth middleware
-├── auth_service.py            # Auth service wrapper for APIs
-├── auth_dependencies.py       # FastAPI auth dependencies
-├── user_models.py             # Pydantic models for User API
-├── users_router.py            # FastAPI router for User Management API
-├── user_api.py                # Main FastAPI app for User Management
-├── test_user_api.py           # User API unit tests
-├── README_USER_API.md         # User Management API documentation
-├── mcp_server.py             # MCP server for tool management
-├── mcp_client.py              # MCP client for tool invocation
-├── system_integration.py       # Main integration module
-├── architecture.py            # Architecture documentation
-├── agent_brain/               # Vector embeddings storage
-├── checkpoints.db             # LangGraph state persistence
-├── .specify/                  # SpecKit specifications and templates
-│   ├── memory/constitution.md # API development constitution
-│   ├── specs/                 # Generated specifications
-│   └── templates/             # Spec templates
-├── AGENTS.md                  # Agent development guidelines
-├── MICROSOFT_COMPLIANCE.md    # Microsoft architecture compliance check
-├── TESTING.md                 # Test suite documentation
-├── TEST_RESULTS.md            # Unit test results summary
-├── requirements.txt            # Python dependencies
-├── test_*.py                  # Unit test files (198 tests, 100% pass)
-└── .gitignore                 # Git ignore rules
+├── 📱 Core Applications
+│   ├── app.py                    # Streamlit web interface
+│   └── apis/
+│       └── user_api.py           # User Management API server
+│
+├── 🤖 Agent System
+│   ├── planner_agent_team_v3.py  # Core agent orchestrator (SpecKit-enhanced)
+│   ├── intent_classifier.py      # Intent classification component
+│   ├── agent_versioning.py       # Agent versioning state machine
+│   ├── system_integration.py     # Main integration module
+│   └── architecture.py           # Architecture documentation
+│
+├── 🔌 API Services
+│   ├── apis/
+│   │   └── users_router.py       # User Management API endpoints
+│   ├── monitoring/
+│   │   └── health_monitor.py     # Health monitoring API
+│   └── mcp_server.py            # MCP tool server
+│
+├── 🔐 Authentication & Security
+│   ├── auth_system.py            # Core RBAC authentication system
+│   ├── auth_middleware.py        # FastAPI authentication middleware
+│   └── auth/
+│       ├── auth_service.py       # Auth service wrapper for APIs
+│       ├── auth_dependencies.py  # FastAPI auth dependencies & RBAC
+│       └── user_models.py        # Pydantic models for User API
+│
+├── 📊 Monitoring & Metrics
+│   ├── metrics.py                # Prometheus metrics integration
+│   └── token_tracker.py          # Token consumption tracking
+│
+├── 🛠️  Development Tools
+│   ├── mcp_client.py             # MCP tool client
+│   └── .specify/                 # SpecKit specifications & templates
+│       ├── memory/constitution.md # API development constitution
+│       ├── specs/                # Generated specifications
+│       └── templates/            # Spec templates
+│
+├── 📋 Data & Models
+│   ├── agent_brain/              # Vector embeddings storage
+│   └── checkpoints.db            # LangGraph state persistence
+│
+├── 🧪 Testing
+│   ├── test_*.py                 # Unit test files (211 tests total, 100% pass)
+│   ├── testing/
+│   │   ├── test_user_api.py      # User API specific tests
+│   │   ├── test_user_management_api.py # Additional API tests
+│   │   ├── TESTING.md            # Test suite documentation
+│   │   └── TEST_RESULTS.md       # Test results summary
+│
+├── 📚 Documentation
+│   ├── README.md                 # Main project documentation
+│   ├── docs/
+│   │   └── README_USER_API.md    # User Management API docs
+│   ├── AGENTS.md                 # Agent development guidelines
+│   ├── MICROSOFT_COMPLIANCE.md   # Architecture compliance check
+│   └── USAGE_GUIDE.md            # Usage and deployment guide
+│
+└── ⚙️  Configuration
+    ├── requirements.txt          # Python dependencies
+    └── .gitignore               # Git ignore rules
 ```
 
 ## Test Coverage Results

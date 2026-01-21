@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from auth_middleware import get_current_user as base_get_current_user, AuthenticatedUser
 from auth_system import get_auth_manager, UserRole
-from user_models import User, UserResponse
+from auth.user_models import User, UserResponse
 
 
 security = HTTPBearer()

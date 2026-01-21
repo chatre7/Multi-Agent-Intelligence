@@ -10,8 +10,8 @@ from fastapi import HTTPException
 import json
 from unittest.mock import patch, MagicMock
 
-from user_api import app
-from user_models import (
+from apis.user_api import app
+from auth.user_models import (
     User,
     UserCreate,
     UserUpdate,
@@ -20,8 +20,8 @@ from user_models import (
     ErrorResponse,
     HealthResponse,
 )
-from auth_dependencies import get_current_user, require_role
-from auth_service import get_user_service
+from auth.auth_dependencies import get_current_user, require_role
+from auth.auth_service import get_user_service
 
 
 client = TestClient(app)
@@ -70,7 +70,7 @@ class TestUserModels:
 class TestAuthDependencies:
     """Test authentication and authorization dependencies."""
 
-    @patch("auth_dependencies.base_get_current_user")
+    @patch("auth.auth_dependencies.base_get_current_user")
     def test_get_current_user_success(self, mock_get_user):
         """Test successful user retrieval."""
         mock_user = MagicMock()
@@ -93,7 +93,7 @@ class TestAuthDependencies:
 class TestUserService:
     """Test the user service wrapper."""
 
-    @patch("auth_service.get_auth_manager")
+    @patch("auth.auth_service.get_auth_manager")
     def test_create_user_success(self, mock_get_manager):
         """Test successful user creation."""
         mock_manager = MagicMock()
@@ -138,8 +138,8 @@ class TestAPIEndpoints:
         data = response.json()
         assert data["service"] == "User Management API"
 
-    @patch("users_router.require_admin")
-    @patch("users_router.get_user_service")
+    @patch("apis.users_router.require_admin")
+    @patch("apis.users_router.get_user_service")
     def test_create_user_unauthorized(self, mock_get_service, mock_require_admin):
         """Test user creation without authorization."""
         # Mock unauthorized access

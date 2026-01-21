@@ -14,8 +14,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
-from users_router import router as users_router, health_router
-from user_models import ErrorResponse, ErrorDetail
+from apis.users_router import router as users_router, health_router
+from auth.user_models import ErrorResponse, ErrorDetail
 
 # Configure logging
 logging.basicConfig(
