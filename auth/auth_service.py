@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from auth_system import get_auth_manager, UserRole as AuthUserRole
-from user_models import User, UserCreate, UserUpdate, UserResponse, UserRole
+from auth.user_models import User, UserCreate, UserUpdate, UserResponse, UserRole
 
 
 class UserManagementService:

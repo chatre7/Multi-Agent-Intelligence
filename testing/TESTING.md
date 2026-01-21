@@ -6,21 +6,22 @@ This document provides an overview of unit tests for the multi-agent system comp
 
 | Test File | Component | Tests | Status |
 |------------|-----------|-------|--------|
-| `test_intent_classifier.py` | Intent Classifier | 16 | ✅ All Pass |
-| `test_health_monitor.py` | Health Monitor | 22 | ✅ All Pass |
-| `test_metrics.py` | Metrics System | 30 | ✅ All Pass |
-| `test_token_tracker.py` | Token Tracker | 25 | ✅ All Pass |
-| `test_agent_versioning.py` | Agent Versioning | 25 | ✅ All Pass |
-| `test_mcp.py` | MCP Protocol | 31 | ✅ All Pass |
-| `test_auth_system.py` | RBAC/Authentication | 29 | ✅ All Pass |
-| `test_system_integration.py` | System Integration | 20 | ✅ All Pass |
-| **TOTAL** | **All Components** | **198** | **100% Pass** |
+| `testing/test_intent_classifier.py` | Intent Classifier | 16 | ✅ All Pass |
+| `testing/test_health_monitor.py` | Health Monitor | 22 | ✅ All Pass |
+| `testing/test_metrics.py` | Metrics System | 30 | ✅ All Pass |
+| `testing/test_token_tracker.py` | Token Tracker | 25 | ✅ All Pass |
+| `testing/test_agent_versioning.py` | Agent Versioning | 25 | ✅ All Pass |
+| `testing/test_mcp.py` | MCP Protocol | 31 | ✅ All Pass |
+| `testing/test_auth_system.py` | RBAC/Authentication | 29 | ✅ All Pass |
+| `testing/test_system_integration.py` | System Integration | 20 | ✅ All Pass |
+| `testing/test_user_api.py` | User Management API | 13 | ✅ All Pass |
+| **TOTAL** | **All Components** | **211** | **100% Pass** |
 
 ## Test Results Summary
 
 ### Intent Classifier Tests (16/16 Passed)
 ```bash
-pytest test_intent_classifier.py -v
+pytest testing/test_intent_classifier.py -v
 ```
 
 **Coverage:**
@@ -36,7 +37,7 @@ pytest test_intent_classifier.py -v
 
 ### Health Monitor Tests (22/22 Passed)
 ```bash
-pytest test_health_monitor.py -v
+pytest testing/test_health_monitor.py -v
 ```
 
 **Coverage:**
@@ -55,7 +56,7 @@ pytest test_health_monitor.py -v
 
 ### Token Tracker Tests (~25/25 Expected Pass)
 ```bash
-pytest test_token_tracker.py -v
+pytest testing/test_token_tracker.py -v
 ```
 
 **Coverage:**
@@ -73,7 +74,7 @@ pytest test_token_tracker.py -v
 
 ### Metrics System Tests (~30/30 Expected Pass)
 ```bash
-pytest test_metrics.py -v
+pytest testing/test_metrics.py -v
 ```
 
 **Note:** Requires `prometheus-client` installation.
@@ -95,7 +96,7 @@ pytest test_metrics.py -v
 
 ### System Integration Tests (20/20 Passed)
 ```bash
-pytest test_system_integration.py -v
+pytest testing/test_system_integration.py -v
 ```
 
 **Status:** ✅ All tests passing with prometheus-client
@@ -115,7 +116,7 @@ pytest test_system_integration.py -v
 
 ### MCP Tests (31/31 Passed)
 ```bash
-pytest test_mcp.py -v
+pytest testing/test_mcp.py -v
 ```
 
 **Coverage:**
@@ -148,45 +149,45 @@ pytest --cov=. --cov-report=html
 ### 1. Intent Classifier
 ```bash
 # Run specific test file
-pytest test_intent_classifier.py -v
+pytest testing/test_intent_classifier.py -v
 
 # Run specific test
 pytest test_intent_classifier.py::TestIntentClassifier::test_initialization_default_config
 
 # Run with verbose output
-pytest test_intent_classifier.py -vv
+pytest testing/test_intent_classifier.py -vv
 ```
 
 ### 2. Health Monitor
 ```bash
-pytest test_health_monitor.py -v
+pytest testing/test_health_monitor.py -v
 ```
 
 ### 3. Token Tracker
 ```bash
-pytest test_token_tracker.py -v
+pytest testing/test_token_tracker.py -v
 ```
 
 ### 4. Metrics System
 ```bash
 pip install prometheus-client
-pytest test_metrics.py -v
+pytest testing/test_metrics.py -v
 ```
 
 ### 5. MCP Protocol
 ```bash
-pytest test_mcp.py -v
+pytest testing/test_mcp.py -v
 ```
 
 ### 6. Agent Versioning
 ```bash
-pytest test_agent_versioning.py -v
+pytest testing/test_agent_versioning.py -v
 ```
 
 ### 7. System Integration
 ```bash
 pip install prometheus-client
-pytest test_system_integration.py -v
+pytest testing/test_system_integration.py -v
 ```
 
 ## Test Patterns Used
@@ -216,7 +217,7 @@ pytest -v
 pytest --cov=. --cov-report=html
 
 # Run specific component tests
-pytest test_intent_classifier.py test_health_monitor.py
+pytest testing/test_intent_classifier.py testing/test_health_monitor.py
 
 # Run with filter
 pytest -k "intent or classifier"

@@ -9,15 +9,15 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from auth_dependencies import (
+from auth.auth_dependencies import (
     get_current_user,
     require_admin,
     require_ownership_or_admin,
     get_current_user_model,
     validate_user_exists,
 )
-from auth_service import get_user_service
-from user_models import (
+from auth.auth_service import get_user_service
+from auth.user_models import (
     User,
     UserCreate,
     UserUpdate,
