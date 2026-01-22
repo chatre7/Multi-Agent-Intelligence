@@ -16,7 +16,10 @@
       "Bash(fi)",
       "Bash(pkill:*)",
       "Bash(git pull:*)",
-      "Bash(gh auth status:*)"
+      "Bash(gh auth status:*)",
+      "mcp__acp__Bash",
+      "mcp__acp__Write",
+      "mcp__acp__Edit"
     ]
   }
 }

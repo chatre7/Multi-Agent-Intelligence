@@ -1,0 +1,6 @@
+id: demo
+name: Demo
+description: Demo domain
+agents: [demo_agent]
+default_agent: demo_agent
+allowed_roles: [developer, admin]

@@ -1,0 +1,27 @@
+id: echo
+name: echo
+description: Echo a value (no approval required).
+parameters_schema:
+  type: object
+  required: ["value"]
+  properties:
+    value:
+      type: string
+returns_schema:
+  type: object
+  properties:
+    ok:
+      type: boolean
+    echo:
+      type: object
+handler_path: "src.infrastructure.tools.noop.noop"
+timeout_seconds: 10
+max_retries: 0
+requires_approval: false
+allowed_roles: ["user", "developer", "admin"]
+tags: ["utility"]
+domain: null
+version: "1.0.0"
+is_async: false
+metadata: {}
+

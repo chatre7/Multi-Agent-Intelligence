@@ -1,0 +1,10 @@
+id: demo_agent
+name: DemoAgent
+domain_id: demo
+description: Demo agent
+version: 1.0.0
+state: development
+system_prompt: ''
+capabilities: []
+tools: []
+model_name: gpt-4o-mini

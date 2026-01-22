@@ -1,0 +1,30 @@
+id: save_file
+name: save_file
+description: Save a file to disk (requires approval).
+parameters_schema:
+  type: object
+  required: ["path", "content"]
+  properties:
+    path:
+      type: string
+      description: Path to write.
+    content:
+      type: string
+      description: File contents.
+returns_schema:
+  type: object
+  properties:
+    ok:
+      type: boolean
+    path:
+      type: string
+handler_path: "src.infrastructure.tools.file_tools.save_file"
+timeout_seconds: 30
+max_retries: 0
+requires_approval: true
+allowed_roles: ["developer", "admin"]
+tags: ["file", "io"]
+domain: software_development
+version: "1.0.0"
+is_async: false
+metadata: {}
