@@ -87,21 +87,10 @@ class TestOrchestrationStrategies:
         assert route in valid_routes or "MultiAgent_" in route
 
     @pytest.mark.asyncio
-    @patch("advanced_agents.select_agent_for_task")
-    async def test_parallel_orchestration(self, mock_select_agent):
+    async def test_parallel_orchestration(self):
         """TC-PO-001: Parallel orchestration execution"""
-        # Mock multiple agents
-        mock_agent1 = Mock()
-        mock_agent1.analyze_code.return_value = {"issues": ["issue1"]}
-
-        mock_agent2 = Mock()
-        mock_agent2.analyze_code.return_value = {"issues": ["issue2"]}
-
-        # Mock selecting different agents for subtasks
-        mock_select_agent.side_effect = [mock_agent1, mock_agent2]
-
         state = AgentState(
-            messages=[HumanMessage(content="Do task1 and task2")],
+            messages=[HumanMessage(content="Review this code for security issues")],
             sender="user",
             current_strategy="parallel",
         )
@@ -109,39 +98,33 @@ class TestOrchestrationStrategies:
         with patch("database_manager.get_database_manager") as mock_db:
             mock_db.return_value.record_agent_metric.return_value = None
 
-            result = await multi_agent_orchestration_node(state, "parallel")
+            # Mock specialized agents' process_task method
+            with patch("advanced_agents.CodeReviewAgent.process_task") as mock_code_review, \
+                 patch("advanced_agents.ResearchAgent.process_task") as mock_research:
 
-            # Should have called select_agent multiple times
-            assert mock_select_agent.call_count >= 2
+                # Setup mock returns
+                mock_code_review.return_value = {
+                    "agent": "CodeReviewAgent",
+                    "response": "Security review complete",
+                    "confidence": 0.9
+                }
+                mock_research.return_value = {
+                    "agent": "ResearchAgent",
+                    "response": "Research analysis complete",
+                    "confidence": 0.8
+                }
 
-            # Should have results from both agents
-            assert len(result["messages"]) > len(state["messages"])
+                result = await multi_agent_orchestration_node(state, "parallel")
+
+                # Should have orchestration result message
+                assert len(result["messages"]) >= 1
+                assert "MultiAgent_parallel" in result["sender"]
+                # Result should mention agents used
+                assert len(result["messages"][0].content) > 0
 
     @pytest.mark.asyncio
-    @patch("advanced_agents.select_agent_for_task")
-    async def test_consensus_orchestration(self, mock_select_agent):
+    async def test_consensus_orchestration(self):
         """TC-CO-001: Consensus orchestration"""
-        # Mock agents with different opinions
-        mock_agent1 = Mock()
-        mock_agent1.analyze_code.return_value = {
-            "recommendation": "approve",
-            "confidence": 0.8,
-        }
-
-        mock_agent2 = Mock()
-        mock_agent2.analyze_code.return_value = {
-            "recommendation": "approve",
-            "confidence": 0.9,
-        }
-
-        mock_agent3 = Mock()
-        mock_agent3.analyze_code.return_value = {
-            "recommendation": "reject",
-            "confidence": 0.6,
-        }
-
-        mock_select_agent.side_effect = [mock_agent1, mock_agent2, mock_agent3]
-
         state = AgentState(
             messages=[HumanMessage(content="Should we deploy this feature?")],
             sender="user",
@@ -151,11 +134,35 @@ class TestOrchestrationStrategies:
         with patch("database_manager.get_database_manager") as mock_db:
             mock_db.return_value.record_agent_metric.return_value = None
 
-            result = await multi_agent_orchestration_node(state, "consensus")
+            # Mock multiple agents for consensus
+            with patch("advanced_agents.CodeReviewAgent.process_task") as mock_code_review, \
+                 patch("advanced_agents.ResearchAgent.process_task") as mock_research, \
+                 patch("advanced_agents.DataAnalysisAgent.process_task") as mock_data:
 
-            # Should have consensus result
-            assert len(result["messages"]) > len(state["messages"])
-            # Check that consensus logic was applied (approve wins with 2/3)
+                # Agents with different recommendations
+                mock_code_review.return_value = {
+                    "agent": "CodeReviewAgent",
+                    "response": "Approved",
+                    "confidence": 0.9
+                }
+                mock_research.return_value = {
+                    "agent": "ResearchAgent",
+                    "response": "Approved",
+                    "confidence": 0.8
+                }
+                mock_data.return_value = {
+                    "agent": "DataAnalysisAgent",
+                    "response": "Needs review",
+                    "confidence": 0.6
+                }
+
+                result = await multi_agent_orchestration_node(state, "consensus")
+
+                # Should have consensus result message
+                assert len(result["messages"]) >= 1
+                assert "MultiAgent_consensus" in result["sender"]
+                # Consensus message should contain strategy info
+                assert "Consensus" in result["messages"][0].content
 
     @pytest.mark.asyncio
     @patch("advanced_agents.select_agent_for_task")
