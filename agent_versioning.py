@@ -6,7 +6,7 @@ Provides version tracking, environment transitions, and production sealing.
 
 import json
 from typing import Dict, List, Optional, Any, NamedTuple
-from datetime import datetime
+from datetime import datetime, UTC
 from dataclasses import dataclass, asdict
 from enum import Enum
 from pathlib import Path
@@ -216,7 +216,7 @@ class AgentVersionManager:
         if agent_name in self._versions and version in self._versions[agent_name]:
             raise ValueError(f"Version {version} already exists for agent {agent_name}")
 
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
 
         agent_version = AgentVersion(
             agent_name=agent_name,
@@ -354,7 +354,7 @@ class AgentVersionManager:
             if field in metadata:
                 setattr(agent_version, field, metadata[field])
 
-        agent_version.updated_at = datetime.utcnow().isoformat()
+        agent_version.updated_at = datetime.now(UTC).isoformat()
         self._save_versions()
         return agent_version
 
@@ -412,10 +412,10 @@ class AgentVersionManager:
 
         # Perform transition
         agent_version.state = transition.to_state
-        agent_version.updated_at = datetime.utcnow().isoformat()
+        agent_version.updated_at = datetime.now(UTC).isoformat()
 
         # Set timestamps based on new state
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(UTC).isoformat()
         if transition.to_state == AgentState.PRODUCTION:
             agent_version.promoted_at = now
         elif transition.to_state == AgentState.DEPRECATED:

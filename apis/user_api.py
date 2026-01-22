@@ -7,7 +7,7 @@ RBAC authorization, and comprehensive CRUD operations.
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -85,7 +85,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         content={
             "error": "http_error",
             "message": exc.detail,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         },
     )
 
@@ -137,7 +137,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     error_data = {
         "error": "internal_error",
         "message": "An unexpected error occurred",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     return JSONResponse(

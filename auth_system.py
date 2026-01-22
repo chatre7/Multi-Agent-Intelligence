@@ -10,7 +10,7 @@ import secrets
 import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from dataclasses import dataclass, asdict
 from enum import Enum
 
@@ -138,7 +138,7 @@ class User:
 
     def __post_init__(self):
         if self.created_at is None:
-            self.created_at = datetime.utcnow().isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""
@@ -347,14 +347,14 @@ class AuthManager:
         # Reset failed attempts on successful login
         user.failed_login_attempts = 0
         user.locked_until = None
-        user.last_login = datetime.utcnow().isoformat()
+        user.last_login = datetime.now(UTC).isoformat()
         self._save_users()
 
         return user
 
     def generate_token(self, user: User) -> AccessToken:
         """Generate JWT token for authenticated user."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         expires_at = now + timedelta(hours=self.config.jwt_expiration_hours)
 
         payload = {
@@ -428,7 +428,7 @@ class AuthManager:
                     updates[field] = UserRole(updates[field])
                 setattr(user, field, updates[field])
 
-        user.updated_at = datetime.utcnow().isoformat()
+        user.updated_at = datetime.now(UTC).isoformat()
         self._save_users()
         return user
 
@@ -484,7 +484,7 @@ class AuthManager:
         user.failed_login_attempts += 1
 
         if user.failed_login_attempts >= self.config.max_login_attempts:
-            lockout_until = datetime.utcnow() + timedelta(
+            lockout_until = datetime.now(UTC) + timedelta(
                 minutes=self.config.lockout_duration_minutes
             )
             user.locked_until = lockout_until.isoformat()
@@ -495,7 +495,10 @@ class AuthManager:
         """Check if account is locked."""
         if user.locked_until:
             lockout_time = datetime.fromisoformat(user.locked_until)
-            return datetime.utcnow() < lockout_time
+            # Ensure both datetimes are timezone-aware for comparison
+            if lockout_time.tzinfo is None:
+                lockout_time = lockout_time.replace(tzinfo=UTC)
+            return datetime.now(UTC) < lockout_time
         return False
 
     def _load_users(self) -> None:

@@ -9,7 +9,7 @@ import json
 import time
 from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -286,7 +286,7 @@ class TokenTracker(BaseCallbackHandler):
 
             data = {
                 "records": [r.to_dict() for r in self._records],
-                "last_updated": datetime.utcnow().isoformat(),
+                "last_updated": datetime.now(UTC).isoformat(),
             }
 
             with open(self._storage_path, "w", encoding="utf-8") as f:

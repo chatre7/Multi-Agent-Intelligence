@@ -9,7 +9,7 @@ import sqlite3
 import json
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, List, Any, Optional
 from contextlib import contextmanager
 import threading
@@ -193,7 +193,7 @@ class DatabaseManager:
             cursor = conn.cursor()
 
             user_id = user_data.get("id") or str(uuid.uuid4())
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(UTC).isoformat()
 
             cursor.execute(
                 """
@@ -257,7 +257,7 @@ class DatabaseManager:
                 return self.get_user(user_id)
 
             set_parts.append("updated_at = ?")
-            values.append(datetime.utcnow().isoformat())
+            values.append(datetime.now(UTC).isoformat())
 
             query = f"UPDATE users SET {', '.join(set_parts)} WHERE id = ?"
             values.append(user_id)
@@ -347,7 +347,7 @@ class DatabaseManager:
             cursor = conn.cursor()
 
             # Calculate date threshold
-            threshold_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            threshold_date = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             cursor.execute(
                 """
@@ -412,7 +412,7 @@ class DatabaseManager:
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
-            threshold_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            threshold_date = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             query = """
                 SELECT
@@ -502,7 +502,7 @@ class DatabaseManager:
             cursor = conn.cursor()
 
             threshold_time = (
-                datetime.utcnow() - timedelta(hours=max_age_hours)
+                datetime.now(UTC) - timedelta(hours=max_age_hours)
             ).isoformat()
 
             cursor.execute(
@@ -543,7 +543,7 @@ class DatabaseManager:
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
-            threshold_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+            threshold_date = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             cursor.execute(
                 """

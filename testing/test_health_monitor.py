@@ -2,7 +2,7 @@
 
 import pytest
 import asyncio
-from datetime import datetime
+from datetime import datetime, UTC
 from monitoring.health_monitor import HealthMonitor, HealthConfig, AgentHealth, get_health_monitor
 
 
@@ -14,7 +14,7 @@ class TestAgentHealth:
         health = AgentHealth(
             name="planner",
             status="healthy",
-            last_check=datetime.utcnow().isoformat(),
+            last_check=datetime.now(UTC).isoformat(),
             response_time_ms=100.5,
         )
 

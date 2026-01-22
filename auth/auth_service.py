@@ -6,7 +6,7 @@ the existing auth_system.py, abstracting the underlying implementation.
 """
 
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 from auth_system import get_auth_manager
 from auth.user_models import User, UserCreate, UserUpdate, UserRole
@@ -49,8 +49,8 @@ class UserManagementService:
                 username=created_user.get("username", user_data.username),
                 email=created_user.get("email", user_data.email),
                 role=UserRole(created_user.get("role", user_data.role.value)),
-                created_at=created_user.get("created_at", datetime.utcnow()),
-                updated_at=created_user.get("updated_at", datetime.utcnow()),
+                created_at=created_user.get("created_at", datetime.now(UTC)),
+                updated_at=created_user.get("updated_at", datetime.now(UTC)),
                 is_active=created_user.get("is_active", True),
             )
 

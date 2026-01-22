@@ -15,7 +15,8 @@
       "Bash(else echo \"Tests still running...\")",
       "Bash(fi)",
       "Bash(pkill:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(gh auth status:*)"
     ]
   }
 }

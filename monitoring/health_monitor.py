@@ -7,7 +7,7 @@ Monitors agent status, connection health, and system metrics.
 import time
 import asyncio
 from typing import Dict, Optional, Any
-from datetime import datetime
+from datetime import datetime, UTC
 from dataclasses import dataclass, asdict
 
 from fastapi import FastAPI, HTTPException, Depends
@@ -87,7 +87,7 @@ class HealthMonitor:
         self._agents[name] = AgentHealth(
             name=name,
             status="unknown",
-            last_check=datetime.utcnow().isoformat(),
+            last_check=datetime.now(UTC).isoformat(),
             response_time_ms=0.0,
             metadata=metadata or {},
         )
@@ -127,7 +127,7 @@ class HealthMonitor:
                 agent.status = "unhealthy"
                 agent.error_count += 1
 
-            agent.last_check = datetime.utcnow().isoformat()
+            agent.last_check = datetime.now(UTC).isoformat()
             agent.response_time_ms = round(response_time, 2)
 
             return asdict(agent)
@@ -135,7 +135,7 @@ class HealthMonitor:
             agent.status = "unhealthy"
             agent.error_count += 1
             agent.last_error = str(e)
-            agent.last_check = datetime.utcnow().isoformat()
+            agent.last_check = datetime.now(UTC).isoformat()
 
             return asdict(agent)
 
@@ -166,7 +166,7 @@ class HealthMonitor:
 
         return {
             "status": overall_status,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "uptime_seconds": time.time() - self._system_start_time,
             "agents": results,
         }
@@ -198,7 +198,7 @@ class HealthMonitor:
             All agent health statuses.
         """
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "uptime_seconds": time.time() - self._system_start_time,
             "agents": {name: asdict(agent) for name, agent in self._agents.items()},
         }

@@ -7,7 +7,7 @@ Exposes tools as standardized service that agents can discover and invoke.
 import asyncio
 from typing import Dict, List, Any, Callable, Optional
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 
 
@@ -51,7 +51,7 @@ class ToolResult:
 
     def __post_init__(self):
         if self.timestamp is None:
-            self.timestamp = datetime.utcnow().isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
 
 class MCPServer:

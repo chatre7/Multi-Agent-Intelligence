@@ -258,5 +258,31 @@
     "password_hash": "$2b$12$iaaq.L7bXwiWr1ZWNOQUAOJwZ7RQRFZGE3TVTXSPiuxkqGYdS4BJq",
     "failed_login_attempts": 0,
     "locked_until": null
+  },
+  "user_1769051028_b1df70a9": {
+    "id": "user_1769051028_b1df70a9",
+    "username": "user_expired_8ed49dfa",
+    "email": "user_expired_8ed49dfa@test.com",
+    "full_name": "Test User",
+    "role": "user",
+    "is_active": true,
+    "created_at": "2026-01-22T03:03:48.795764+00:00",
+    "last_login": "2026-01-22T03:03:49.406373+00:00",
+    "password_hash": "$2b$12$FXaKR8YQ0aMhphbuNUHB0O/dvkZhqQtjqQU1ZwpYeFtjzn0o06rqO",
+    "failed_login_attempts": 0,
+    "locked_until": null
+  },
+  "user_1769051338_fafc3f5c": {
+    "id": "user_1769051338_fafc3f5c",
+    "username": "user_expired_b43d91b7",
+    "email": "user_expired_b43d91b7@test.com",
+    "full_name": "Test User",
+    "role": "user",
+    "is_active": true,
+    "created_at": "2026-01-22T03:08:58.601808+00:00",
+    "last_login": "2026-01-22T03:08:59.050703+00:00",
+    "password_hash": "$2b$12$M1ZL69sGPKTW3k3EiGJ/nOKfDBR1DiFKMrRYtF1meBRcwC7Pa.VdO",
+    "failed_login_attempts": 0,
+    "locked_until": null
   }
 }

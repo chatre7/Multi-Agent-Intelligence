@@ -7,7 +7,7 @@ Tracks token usage, agent performance, and system health metrics.
 import time
 from typing import Optional, Dict, List
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, UTC
 from contextlib import contextmanager
 from functools import wraps
 
@@ -166,7 +166,7 @@ class AgentMetrics:
         self._agent_info.labels(agent=agent_name).info(
             {
                 "model": model_name,
-                "last_call": datetime.utcnow().isoformat(),
+                "last_call": datetime.now(UTC).isoformat(),
                 "status": status,
             }
         )
