@@ -1,7 +1,0 @@
-id: demo_tool
-name: DemoTool
-description: Demo tool
-parameters_schema: {type: object}
-returns_schema: {type: object}
-requires_approval: false
-allowed_roles: [developer, admin]
