@@ -88,6 +88,7 @@ class TestMultiAgentSystem:
         assert result["user_input"] == "Create a Python script"
         assert "target_agent" in result
 
+    @pytest.mark.asyncio
     async def test_check_system_health(self, system):
         """Test checking system health."""
 
@@ -114,18 +115,20 @@ class TestMultiAgentSystem:
         assert "daily_cost" in summary
         assert "metrics" in summary
 
+    @pytest.mark.asyncio
     async def test_start_health_monitoring(self, system):
         """Test starting health monitoring."""
         await system.start_health_monitoring()
 
         assert system.health_monitor._is_running is True
 
-        await system.stop_health_monitoring()
+        system.stop_health_monitoring()
 
+    @pytest.mark.asyncio
     async def test_stop_health_monitoring(self, system):
         """Test stopping health monitoring."""
         await system.start_health_monitoring()
-        await system.stop_health_monitoring()
+        system.stop_health_monitoring()
 
         assert system.health_monitor._is_running is False
 
@@ -263,6 +266,7 @@ class TestErrorHandling:
         assert result is not None
         assert "confidence" in result
 
+    @pytest.mark.asyncio
     async def test_health_monitor_error_handling(self):
         """Test system handles health check errors."""
         system = MultiAgentSystem()
