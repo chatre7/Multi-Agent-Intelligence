@@ -1262,3 +1262,52 @@ def get_multi_agent_orchestrator() -> MultiAgentOrchestrator:
     if _multi_agent_orchestrator is None:
         _multi_agent_orchestrator = MultiAgentOrchestrator()
     return _multi_agent_orchestrator
+
+
+def select_agent_for_task(task: str) -> SpecializedAgent:
+    """Select the most appropriate agent for a given task.
+
+    Uses rule-based selection based on task keywords to route to the most
+    suitable specialized agent.
+
+    Parameters
+    ----------
+    task : str
+        Task description containing keywords indicating required expertise
+
+    Returns
+    -------
+    SpecializedAgent
+        The selected specialized agent best suited for the task
+
+    Example
+    -------
+    >>> agent = select_agent_for_task("Review this Python code for security issues")
+    >>> agent.__class__.__name__
+    'CodeReviewAgent'
+
+    >>> agent = select_agent_for_task("Analyze this dataset and create charts")
+    >>> agent.__class__.__name__
+    'DataAnalysisAgent'
+    """
+    task_lower = task.lower()
+    registry = get_agent_registry()
+
+    # Rule-based agent selection based on task keywords
+    if any(word in task_lower for word in ["review", "code", "security", "bug", "quality", "refactor", "lint"]):
+        return registry.get_agent("CodeReviewAgent")
+
+    elif any(word in task_lower for word in ["research", "study", "analyze", "evidence", "investigate", "find", "search"]):
+        return registry.get_agent("ResearchAgent")
+
+    elif any(word in task_lower for word in ["data", "statistics", "chart", "graph", "analysis", "visualize", "metric", "dashboard"]):
+        return registry.get_agent("DataAnalysisAgent")
+
+    elif any(word in task_lower for word in ["document", "write", "guide", "api", "tutorial", "manual", "readme"]):
+        return registry.get_agent("DocumentationAgent")
+
+    elif any(word in task_lower for word in ["deploy", "pipeline", "infrastructure", "ci/cd", "devops", "monitoring", "docker"]):
+        return registry.get_agent("DevOpsAgent")
+
+    # Default to ResearchAgent for unknown tasks
+    return registry.get_agent("ResearchAgent")

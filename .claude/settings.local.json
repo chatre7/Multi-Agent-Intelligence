@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pytest:*)",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(find:*)",
+      "Bash(python:*)",
+      "Bash(tee:*)",
+      "Bash(if [ -f test_agent_quality_results.json ])",
+      "Bash(then echo \"Results file exists\")",
+      "Bash(else echo \"Tests still running...\")",
+      "Bash(fi)",
+      "Bash(pkill:*)",
+      "Bash(git pull:*)"
+    ]
+  }
+}
