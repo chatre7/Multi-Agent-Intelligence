@@ -45,6 +45,12 @@ htmlcov/
 *.db-shm
 *.db-wal
 checkpoints.db*
+agent_versions.json
+users.json
+
+# Backend Temporary Files
+backend/.test_tmp/
+backend/.tool_files/
 
 # Vector Storage
 agent_brain/
@@ -58,6 +64,10 @@ agent_brain/
 .env.local
 *.key
 *.pem
+data/.jwt_secret
+data/search_budget.json
+data/search_cache.json
+data/token_usage_export_*.json
 
 # Logs
 *.log
