@@ -22,6 +22,7 @@ interface ConversationStore {
   setError: (error: string | null) => void;
   setIsStreaming: (streaming: boolean) => void;
   startNewConversation: (domainId: string, agentId: string) => void;
+  updateLastMessageAgentId: (agentId: string) => void;
   clearError: () => void;
 }
 
@@ -62,6 +63,28 @@ export const useConversationStore = create<ConversationStore>((set) => ({
         ...lastMessage,
         content: lastMessage.content + delta,
         delta,
+      };
+      return {
+        currentConversation: {
+          ...state.currentConversation,
+          messages,
+        },
+      };
+    }),
+
+  updateLastMessageAgentId: (agentId) =>
+    set((state) => {
+      if (
+        !state.currentConversation ||
+        state.currentConversation.messages.length === 0
+      ) {
+        return state;
+      }
+      const messages = [...state.currentConversation.messages];
+      const lastMessage = messages[messages.length - 1];
+      messages[messages.length - 1] = {
+        ...lastMessage,
+        agent_id: agentId,
       };
       return {
         currentConversation: {

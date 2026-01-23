@@ -3,10 +3,26 @@
 > Zero-code domain extension platform with modern React UI, Clean Architecture + TDD, and real-time WebSocket streaming
 
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-green)
-![Backend Tests](https://img.shields.io/badge/Backend%20Tests-119%2F119%20passing-green)
+![Backend Tests](https://img.shields.io/badge/Backend%20Tests-150%2B%20passing-green)
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019%2BVite-blue)
 ![Docker](https://img.shields.io/badge/Docker-Production%20Ready-blue)
 ![License](https://img.shields.io/badge/License-MIT-orange)
+
+---
+
+## 📢 Latest Updates (v1.2.0) - Jan 23, 2026
+
+### 🌟 New Features
+- **Multi-Workflow Strategies**: Flexible agent orchestration tailored to your needs:
+  - `orchestrator`: Deterministic, step-by-step pipelines (e.g., Software Dev: Plan -> Code -> Review)
+  - `few_shot`: LLM-driven autonomous handoffs with Thai language support (e.g., Social Chat: Empath -> Comedian)
+  - `hybrid`: Combining both strategies for complex domains.
+- **Real LLM Integration**: 
+  - Full support for **Ollama** (local), OpenAI, and compatible providers.
+  - Streaming responses with real-time token delivery.
+- **Improved Performance**:
+  - **Optimized Docker Builds**: Reduced build context size by 90% via `.dockerignore`.
+  - **Fast Tests**: Mocked heavy dependencies (transformers/torch) speeding up test collection by 50x.
 
 ---
 
@@ -16,6 +32,8 @@
 - [Quick Start](#-quick-start)
   - [Development Mode](#development-mode)
   - [Production Mode (Docker)](#production-mode-docker)
+  - [Using Ollama (Local LLM)](#using-ollama-local-llm)
+- [Multi-Workflow Capabilities](#-multi-workflow-capabilities)
 - [Architecture](#-architecture)
 - [API Reference](#-api-reference)
 - [WebSocket Protocol](#-websocket-protocol)
@@ -39,7 +57,7 @@ Transform complex multi-agent orchestration into a **configuration-driven platfo
 
 ✅ **Production-Ready Backend**
 - Clean Architecture (Domain → Application → Infrastructure → Presentation)
-- Test-Driven Development (119+ tests passing)
+- **TDD First**: 150+ comprehensive unit & integration tests
 - Full REST API with 25+ endpoints
 - Real-time WebSocket streaming
 - JWT + RBAC authentication
@@ -50,11 +68,10 @@ Transform complex multi-agent orchestration into a **configuration-driven platfo
 - Real-time chat with streaming
 - Admin panel with metrics dashboard
 
-✅ **Multi-Agent Orchestration**
-- LangGraph-based agent coordination
-- Supervisor pattern with intelligent routing
-- Human-in-the-loop tool approval
-- Version management (DEVELOPMENT → TESTING → PRODUCTION)
+✅ **Intelligent Orchestration**
+- **Dynamic Routing**: Agents can hand off tasks autonomously.
+- **Workflow Strategies**: Choose between rigid pipelines or flexible conversations.
+- **Human-in-the-loop**: Tool approval workflows.
 
 ---
 
@@ -65,7 +82,7 @@ Transform complex multi-agent orchestration into a **configuration-driven platfo
 - **Python 3.11+** - Backend runtime
 - **Node.js 20+** - Frontend runtime (22+ recommended for Vite 7)
 - **Docker & Docker Compose** - For production deployment
-- **Ollama** (optional) - LLM provider
+- **Ollama** (optional) - Recommended for local LLM
 
 ### Development Mode
 
@@ -75,7 +92,7 @@ Run backend and frontend separately for hot-reload development:
 ```bash
 cd backend
 pip install -e .
-python -m uvicorn src.presentation.api.app:create_app --reload --port 8000
+python -m uvicorn src.presentation.api.app:create_app --factory --reload --port 8000
 ```
 
 **2. Start Frontend**
@@ -93,33 +110,61 @@ npm run dev
 
 Single command to build and run the entire stack:
 
-**Option 1: Development with hot-reload**
 ```bash
-docker compose up -d --build
-# Access at http://localhost
-```
-
-**Option 2: Production (static frontend)**
-```bash
+# Optimized production build with Nginx
 docker compose -f docker-compose.prod.yml up -d --build
 # Access at http://localhost
 ```
 
-**Useful Docker Commands:**
-```bash
-# View logs
-docker logs mai-backend -f
-docker logs mai-nginx -f
+### Using Ollama (Local LLM)
 
-# Rebuild single service
-docker compose -f docker-compose.prod.yml up -d --build nginx
-
-# Stop all
-docker compose -f docker-compose.prod.yml down
-
-# Stop and remove volumes
-docker compose -f docker-compose.prod.yml down -v
+1. Install and run Ollama: `ollama run llama3`
+2. Update `.env` or `docker-compose.prod.yml`:
+```env
+LLM_PROVIDER=openai
+OPENAI_BASE_URL=http://host.docker.internal:11434/v1  # or http://localhost:11434/v1
+OPENAI_API_KEY=ollama
+LLM_MODEL=llama3
 ```
+
+---
+
+## 🔀 Multi-Workflow Capabilities
+
+The platform now supports three distinct workflow strategies configurable per domain:
+
+### 1. Orchestrator Strategy
+**Best for**: Defined processes like software development or data pipelines.
+- **Behavior**: Executes agents in a fixed, linear order.
+- **Config**:
+  ```yaml
+  workflow_type: orchestrator
+  orchestration:
+    pipeline: ["planner", "coder", "reviewer"]
+  ```
+
+### 2. Few-Shot Strategy
+**Best for**: Chatbots, customer support, and dynamic conversations.
+- **Behavior**: Agents decide who talks next based on conversation context and few-shot examples.
+- **Config**:
+  ```yaml
+  workflow_type: few_shot
+  few_shot:
+    max_handoffs: 5
+    examples_enabled: true
+  ```
+- **Note**: Now allows Thai language handoffs (e.g., "เครียดจัง" -> handoff to Comedian).
+
+### 3. Hybrid Strategy
+**Best for**: Complex research or multi-phase tasks.
+- **Behavior**: Combines rigid planning phases with flexible execution phases.
+- **Config**:
+  ```yaml
+  workflow_type: hybrid
+  hybrid:
+    orchestrator_decides: ["planning", "validation"]
+    llm_decides: ["agent_selection"]
+  ```
 
 ---
 
@@ -151,7 +196,7 @@ docker compose -f docker-compose.prod.yml down -v
 │  ├─────────────────────────────────────────────────┤    │
 │  │  Application    (Use Cases, Business Logic)      │    │
 │  ├─────────────────────────────────────────────────┤    │
-│  │  Domain         (Entities, Value Objects)        │    │
+│  │  Domain         (Entities, Workflow Strategies)  │    │
 │  ├─────────────────────────────────────────────────┤    │
 │  │  Infrastructure (SQLite, LLM, Repositories)      │    │
 │  └─────────────────────────────────────────────────┘    │
@@ -166,7 +211,7 @@ Multi-Agent-Intelligence/
 │   ├── src/
 │   │   ├── domain/            # Entities, Value Objects
 │   │   ├── application/       # Use Cases
-│   │   ├── infrastructure/    # Repositories, LLM
+│   │   ├── infrastructure/    # Repositories, LLM, LangGraph
 │   │   └── presentation/      # API, WebSocket
 │   ├── tests/                 # Unit & Integration Tests
 │   └── config/                # YAML Configurations
@@ -182,15 +227,7 @@ Multi-Agent-Intelligence/
 │   └── dist/                  # Production build
 │
 ├── nginx/                      # Nginx Configuration
-│   ├── nginx.conf             # Development config
-│   ├── nginx.prod.conf        # Production config
-│   ├── Dockerfile             # Development Dockerfile
-│   └── Dockerfile.prod        # Production Dockerfile
-│
 ├── docs/                       # Documentation
-│   └── WEBSOCKET_PROTOCOL.md  # WebSocket message reference
-│
-├── docker-compose.yml          # Development compose
 ├── docker-compose.prod.yml     # Production compose
 └── README.md                   # This file
 ```
@@ -306,23 +343,23 @@ const ws = new WebSocket(`ws://localhost/ws?token=${token}`);
 
 ### Environment Variables
 
-**Backend (`docker-compose.yml`):**
+**Backend (`docker-compose.yml` or `.env`):**
 ```yaml
 environment:
-  - AUTH_MODE=jwt                    # jwt | none
-  - AUTH_SECRET=your-secret-key      # JWT signing secret
-  - AUTH_USERS=admin:admin:admin     # username:password:role
-  - DATABASE_PATH=/app/data/db.db    # SQLite path
-  - LOG_LEVEL=INFO                   # DEBUG | INFO | WARNING
-  - OLLAMA_BASE_URL=http://localhost:11434  # LLM endpoint
+  - MVP_MODE=false                   # Enable full features
+  - AUTH_MODE=jwt
+  - AUTH_SECRET=your-secret-key
+  - LLM_PROVIDER=openai              # Use 'openai' for Ollama/OpenAI
+  - OPENAI_BASE_URL=http://host.docker.internal:11434/v1
+  - LLM_MODEL=llama3
 ```
 
 **Frontend (`docker-compose.yml`):**
 ```yaml
 environment:
-  - VITE_API_BASE_URL=/api           # API prefix
-  - VITE_WS_URL=/ws                  # WebSocket prefix
-  - BACKEND_HOST=backend             # Docker network hostname
+  - VITE_API_BASE_URL=/api
+  - VITE_WS_URL=/ws
+  - BACKEND_HOST=backend
 ```
 
 ### Default Users
@@ -342,28 +379,19 @@ environment:
 ```bash
 cd backend
 
-# Run all tests
-pytest
+# Run all tests (fast collection enabled)
+uv run pytest
 
-# Run with coverage
-pytest --cov=src --cov-report=html
-
-# Run specific test file
-pytest tests/unit/presentation/test_websocket_connection.py -v
+# Run manual workflow test script
+uv run python scripts/test_workflows.py
 ```
 
 ### Frontend Tests
 
 ```bash
 cd frontend
-
-# Type checking
 npm run type-check
-
-# Linting
 npm run lint
-
-# Build check
 npm run build
 ```
 
@@ -400,7 +428,7 @@ curl http://localhost/api/v1/health
 docker logs mai-backend
 docker logs mai-nginx
 
-# Rebuild from scratch
+# Rebuild from scratch (clean slate)
 docker compose -f docker-compose.prod.yml down -v
 docker compose -f docker-compose.prod.yml up -d --build
 ```
@@ -414,6 +442,34 @@ netstat -ano | findstr :80
 # Kill process (Windows)
 taskkill /PID <PID> /F
 ```
+
+---
+
+## 🔮 Roadmap
+
+### 1. Live Workflow Visualizer (Observability)
+**Visualizing Agent Thoughts in Real-time**
+- **Concept**: Interactive UI graph showing active agents and message flow.
+- **Tech**: React Flow + WebSocket events.
+- **Value**: See exactly when `Empath` decides to hand off to `Comedian`.
+
+### 2. Human-in-the-Loop (Approval Center)
+**Safety First for Powerful Tools**
+- **Concept**: Dashboard for admins to approve sensitive actions (e.g., DB writes, Emails).
+- **Tech**: Existing `ApproveToolRun` API + Admin UI.
+- **Value**: Secure control over autonomous agents.
+
+### 3. Python Code Interpreter (Sandbox)
+**Agents that can Code**
+- **Concept**: Secure Docker sandbox for agents to write/run Python for data analysis.
+- **Tech**: Docker API + Jupyter Kernel.
+- **Value**: Dynamic problem solving and data visualization.
+
+### 4. Voice Mode (Real-time Audio)
+**Conversational Interface**
+- **Concept**: Hands-free interaction via voice.
+- **Tech**: Whisper (STT) + Edge TTS / ElevenLabs.
+- **Value**: Natural, human-like interaction experience.
 
 ---
 
@@ -435,5 +491,5 @@ MIT License - See [LICENSE](./LICENSE) file for details
 
 **Status**: ✅ Production Ready  
 **Last Updated**: January 23, 2026  
-**Version**: 1.1.0
+**Version**: 1.2.0
 

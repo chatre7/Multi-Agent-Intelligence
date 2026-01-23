@@ -28,6 +28,7 @@ export interface Message {
   content: string;
   timestamp: string;
   delta?: string;
+  agent_id?: string;
 }
 
 export interface Conversation {

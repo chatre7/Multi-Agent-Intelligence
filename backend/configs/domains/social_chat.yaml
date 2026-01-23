@@ -1,0 +1,44 @@
+id: social_chat
+name: Social Conversation
+description: Multi-agent social domain for casual conversations and entertainment.
+agents:
+  - storyteller
+  - comedian
+  - philosopher
+  - empath
+default_agent: empath
+workflow_type: supervisor
+max_iterations: 5
+routing_rules:
+  # Storyteller - narrative and creative stories
+  - keywords: ["story", "tale", "narrative", "once upon", "imagine"]
+    agent: storyteller
+    priority: 20
+  # Comedian - jokes and humor
+  - keywords: ["joke", "funny", "laugh", "humor", "haha"]
+    agent: comedian
+    priority: 20
+  # Philosopher - deep thoughts and wisdom
+  - keywords: ["meaning", "why", "philosophy", "life", "wisdom", "think"]
+    agent: philosopher
+    priority: 15
+  # Empath - emotional support and active listening
+  - keywords: ["feel", "emotion", "sad", "happy", "understand"]
+    agent: empath
+    priority: 10
+fallback_agent: empath
+allowed_roles: ["user", "developer", "admin"]
+version: "1.0.0"
+is_active: true
+metadata:
+  owner: community
+  workflow_type: few_shot
+  few_shot:
+    examples_enabled: true
+    max_handoffs: 5
+    handoff_confidence_threshold: 0.7
+  description: >
+    Uses few-shot workflow for flexible agent handoffs based on
+    conversation context. Empath starts, then hands off to
+    Comedian, Philosopher, or Storyteller as needed.
+

@@ -76,21 +76,26 @@ class OpenAIStreamingLLM(StreamingLLM):
             request_messages.append({"role": "system", "content": system_prompt})
         request_messages.extend(messages)
 
-        stream = self._client.chat.completions.create(
-            model=model,
-            messages=request_messages,
-            temperature=float(temperature),
-            max_tokens=int(max_tokens),
-            stream=True,
-        )
-        for event in stream:
-            try:
-                delta = event.choices[0].delta
-                content = getattr(delta, "content", None)
-            except Exception:  # noqa: BLE001
-                content = None
-            if content:
-                yield content
+        print(f"[DEBUG] OpenAI Stream Request: model={model}, base_url={self._client.base_url}")
+        try:
+            stream = self._client.chat.completions.create(
+                model=model,
+                messages=request_messages,
+                temperature=float(temperature),
+                max_tokens=int(max_tokens),
+                stream=True,
+            )
+            for event in stream:
+                try:
+                    delta = event.choices[0].delta
+                    content = getattr(delta, "content", None)
+                    if content:
+                        yield content
+                except Exception as e:
+                     print(f"[DEBUG] OpenAI Stream Event Error: {e}")
+        except Exception as e:
+            print(f"[DEBUG] OpenAI Client Error: {e}")
+            yield ""
 
 
 def llm_from_env() -> StreamingLLM:

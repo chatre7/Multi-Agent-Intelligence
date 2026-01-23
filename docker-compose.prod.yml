@@ -21,9 +21,10 @@ services:
       - LLM_PROVIDER=openai
       - OPENAI_BASE_URL=http://host.docker.internal:11434/v1
       - OPENAI_API_KEY=ollama
+      - LLM_MODEL=gpt-oss:20b-cloud
     volumes:
       - ./backend:/app
-      - backend_data:/app/data
+      - ./backend/data:/app/data
       - backend_logs:/app/logs
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
@@ -33,9 +34,6 @@ services:
     networks:
       - mai-network
     restart: unless-stopped
-    command: >
-      sh -c "pip install -e . &&
-             python -m uvicorn src.presentation.api.app:create_app --host 0.0.0.0 --port 8000 --reload"
 
   # Nginx + Frontend (static build)
   nginx:

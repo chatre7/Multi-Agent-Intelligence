@@ -96,3 +96,17 @@ nginx/logs/
 *.tmp
 *.temp
 .cache/
+
+# Context7 & Claude
+.claude/
+.agent/skills/
+.gemini/
+.antigravity*
+
+# Backend Data
+backend/data/
+backend/.env
+backend/.env.*
+
+# Documentation generated
+backend/docs/_build/

@@ -1,5 +1,5 @@
 /**
- * Main chat container component
+ * Main chat container with proper scrolling
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -30,12 +30,8 @@ export default function ChatContainer({
     const initWebSocket = async () => {
       try {
         setIsConnecting(true);
-        // Supports nginx (/ws) and direct backend (ws://localhost:8000[/ws])
         const wsUrl = resolveWsEndpointUrl();
-        // DIRECT CONNECT DEBUG
-        // const wsUrl = `ws://${window.location.hostname}:8000/ws`;
         console.log("[ChatContainer] Connecting to:", wsUrl);
-        console.log("[ChatContainer] Token:", token ? `present (${token.substring(0, 20)}...)` : "MISSING!");
 
         wsRef.current = new WebSocketClient({
           url: wsUrl,
@@ -46,13 +42,22 @@ export default function ChatContainer({
           store.appendMessageDelta(data.chunk || "");
         });
 
-        wsRef.current.on("message_complete", () => {
+        wsRef.current.on("message_complete", (data) => {
           store.setIsStreaming(false);
+          // Update agent_id from message_complete payload
+          if (data.agentId) {
+            store.updateLastMessageAgentId(data.agentId);
+          }
         });
 
         wsRef.current.on("tool_approval_required", (data) => {
           console.log("Tool approval required:", data);
-          // Handle tool approval UI
+        });
+
+        wsRef.current.on("agent_selected", (data) => {
+          if (data.agent_id) {
+            store.updateLastMessageAgentId(data.agent_id);
+          }
         });
 
         wsRef.current.on("error", (data) => {
@@ -64,7 +69,6 @@ export default function ChatContainer({
         await wsRef.current.connect();
         setIsConnecting(false);
 
-        // Load existing conversation if ID provided
         if (conversationId) {
           try {
             const conversation = await apiClient.getConversation(conversationId);
@@ -89,7 +93,6 @@ export default function ChatContainer({
     return () => {
       wsRef.current?.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, token]);
 
   // Auto-scroll to bottom
@@ -102,7 +105,6 @@ export default function ChatContainer({
       return;
     }
 
-    // Add user message to store
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       role: "user",
@@ -111,18 +113,15 @@ export default function ChatContainer({
     };
     store.addMessage(userMessage);
 
-    // Send via WebSocket
     store.setIsStreaming(true);
     wsRef.current.send({
       type: "send_message",
-      // @ts-ignore - Backend expects specific structure
       conversationId: conversationId,
       payload: {
         content: content,
       },
     } as any);
 
-    // Add assistant message placeholder
     const assistantMessage: Message = {
       id: `msg-${Date.now() + 1}`,
       role: "assistant",
@@ -133,56 +132,52 @@ export default function ChatContainer({
   };
 
   if (!store.currentConversation) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <p className="text-gray-500 mb-4">
-            Select a domain and agent to start chatting
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="h-full flex flex-col bg-white">
+      {/* Messages - Fixed height with scroll */}
+      <div className="flex-1 overflow-y-auto min-h-0">
         {store.currentConversation.messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            <p>Start a conversation</p>
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center px-4">
+              <p className="text-gray-400 text-sm">Start a conversation…</p>
+            </div>
           </div>
         ) : (
           <>
             {store.currentConversation.messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-4" />
           </>
         )}
       </div>
 
-      {/* Error message */}
+      {/* Error Banner */}
       {store.error && (
-        <div className="px-4 py-2 bg-red-100 text-red-700 text-sm rounded">
-          {store.error}
+        <div className="mx-4 mb-3 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl flex items-center justify-between shadow-sm">
+          <span>{store.error}</span>
           <button
             onClick={() => store.clearError()}
-            className="ml-2 font-bold hover:underline"
+            className="ml-4 font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 rounded px-2 py-1"
           >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Input */}
-      <ChatInput
-        onSendMessage={handleSendMessage}
-        disabled={
-          !wsRef.current?.isConnected() || isConnecting || store.isStreaming
-        }
-        isLoading={isConnecting}
-      />
+      {/* Input - Fixed at bottom */}
+      <div className="border-t border-gray-200 bg-white p-4">
+        <ChatInput
+          onSendMessage={handleSendMessage}
+          disabled={
+            !wsRef.current?.isConnected() || isConnecting || store.isStreaming
+          }
+          isLoading={isConnecting}
+        />
+      </div>
     </div>
   );
 }

@@ -1,0 +1,67 @@
+# Root .dockerignore for nginx build
+# This affects nginx Dockerfile which builds from root context
+
+# Backend files (not needed in nginx)
+backend/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+docs/
+
+# Agent/AI artifacts
+.agent/
+.claude/
+.gemini/
+.antigravity*
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+
+# Environment
+.env*
+
+# Logs
+*.log
+logs/
+
+# Frontend dev files (will be built in Dockerfile)
+frontend/node_modules/
+frontend/.next/
+frontend/.turbo/
+frontend/dist/
+frontend/build/
+frontend/.cache/
+
+# Database
+*.db
+*.sqlite*
+data/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Python (backend stuff)
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.pytest_cache/

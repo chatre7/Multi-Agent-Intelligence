@@ -32,6 +32,7 @@ env/
 htmlcov/
 .tox/
 .test_tmp/
+tests/
 
 # IDE
 .vscode/
@@ -48,6 +49,7 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
+data/
 
 # OS files
 .DS_Store
@@ -61,7 +63,31 @@ Thumbs.db
 # Documentation
 *.md
 !README.md
+docs/
 
 # Config files that shouldn't be in image
 .env
 .env.local
+
+# Agent/AI artifacts (IMPORTANT - can be huge!)
+.agent/
+.claude/
+.gemini/
+.antigravity*
+
+# Node modules (if any)
+node_modules/
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+.cache/
+
+# Scripts (optional)
+scripts/

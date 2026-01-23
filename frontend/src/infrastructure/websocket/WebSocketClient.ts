@@ -20,7 +20,8 @@ export type MessageType =
   | "tool_executed"
   | "tool_rejected"
   | "error"
-  | "start_conversation";
+  | "start_conversation"
+  | "agent_selected";
 
 export interface WebSocketMessage {
   type: MessageType;

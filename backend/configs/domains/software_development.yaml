@@ -1,22 +1,53 @@
 id: software_development
 name: Software Development
-description: Domain for coding, debugging, and software engineering tasks.
+description: Domain for coding, debugging, testing, and software engineering tasks.
 agents:
   - coder
+  - debugger
+  - tester
+  - documenter
+  - reviewer
+  - planner
 default_agent: coder
 workflow_type: supervisor
 max_iterations: 5
 routing_rules:
-  - keywords: ["bug", "debug", "error", "traceback"]
+  # Debugger - highest priority for bug-related queries
+  - keywords: ["bug", "error", "exception", "traceback", "crash", "fail", "broken"]
+    agent: debugger
+    priority: 20
+  # Tester - testing related queries
+  - keywords: ["test", "unittest", "pytest", "coverage", "tdd", "mock", "fixture"]
+    agent: tester
+    priority: 15
+  # Reviewer - code review and analysis
+  - keywords: ["review", "check", "security", "performance", "quality", "analyze"]
+    agent: reviewer
+    priority: 12
+  # Documenter - documentation queries
+  - keywords: ["document", "readme", "docstring", "explain", "comment", "guide"]
+    agent: documenter
+    priority: 10
+  # Planner - for high-level project tasks
+  - keywords: ["plan", "project", "architecture", "requirements", "how to build", "strategy"]
+    agent: planner
+    priority: 30
+  # Coder - default for coding tasks
+  - keywords: ["code", "python", "refactor", "optimize", "implement", "create"]
     agent: coder
-    priority: 0
-  - keywords: ["refactor", "optimize", "performance"]
-    agent: coder
-    priority: 1
+    priority: 5
 fallback_agent: coder
 allowed_roles: ["user", "developer", "admin"]
 version: "1.0.0"
 is_active: true
 metadata:
   owner: platform
+  workflow_type: orchestrator
+  orchestration:
+    strategy: deterministic
+    pipeline: [planner, coder, tester, reviewer]
+    continue_on_error: false
+  description: >
+    Uses deterministic orchestrator workflow for predictable  
+    code development: Plan -> Code -> Test -> Review
 

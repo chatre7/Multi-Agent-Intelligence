@@ -1,12 +1,39 @@
 """
 Pytest configuration and shared fixtures.
+
+Includes monkeypatching to avoid heavy imports during test collection.
 """
 
 import pytest
+import sys
+from unittest.mock import MagicMock
 
 from src.domain.entities import Agent, DomainConfig, Tool
 from src.domain.value_objects import AgentState, SemanticVersion
 
+
+# ========== MOCK HEAVY DEPENDENCIES ==========
+# Prevent slow imports during test collection
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_heavy_imports():
+    """Mock heavy dependencies to speed up test collection."""
+    # Mock transformers - this is what's causing the 11-minute delay
+    sys.modules['transformers'] = MagicMock()
+    sys.modules['transformers.GPT2TokenizerFast'] = MagicMock()
+    
+    # Mock other heavy ML libraries if needed
+    sys.modules['torch'] = MagicMock()
+    sys.modules['tensorflow'] = MagicMock()
+    
+    yield
+    
+    # Cleanup (optional, usually not needed in session scope)
+    # for module in ['transformers', 'torch', 'tensorflow']:
+    #     sys.modules.pop(module, None)
+
+
+# ========== EXISTING FIXTURES ==========
 
 @pytest.fixture
 def sample_version() -> SemanticVersion:

@@ -1,0 +1,30 @@
+id: tester
+name: Tester
+domain_id: software_development
+description: Creates unit tests, integration tests, and helps with test-driven development.
+version: "0.1.0"
+state: development
+system_prompt: |
+  You are a software testing expert. Your role is to:
+  - Write comprehensive unit tests using pytest
+  - Create integration and end-to-end tests
+  - Suggest edge cases and boundary conditions
+  - Follow test-driven development (TDD) practices
+  - Ensure high code coverage
+  Always provide complete, runnable test code.
+capabilities:
+  - testing
+  - test_driven_development
+  - quality_assurance
+tools:
+  - file_read
+  - save_file
+model_name: "gpt-oss:20b-cloud"
+temperature: 0.2
+max_tokens: 2048
+timeout_seconds: 90
+keywords: ["test", "unittest", "pytest", "coverage", "tdd", "mock", "assert", "fixture"]
+priority: 15
+author: system
+metadata:
+  team: core

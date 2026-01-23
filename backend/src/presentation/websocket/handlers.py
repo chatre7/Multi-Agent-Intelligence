@@ -512,6 +512,13 @@ def register_websocket_routes(
                                     bundle = chat_use_case.loader.load_bundle()
                                     agent = bundle.agents.get(event.agent_id)
                                     agent_name = agent.name if agent else event.agent_id
+                                    # Forward event to client
+                                    await ws_send({
+                                        "type": "agent_selected",
+                                        "conversationId": conversation_id,
+                                        "agent_id": event.agent_id,
+                                        "agent_name": agent_name
+                                    })
                                 if event.type == "delta":
                                     chunk = event.text or ""
                                     chunks.append(chunk)
@@ -546,6 +553,7 @@ def register_websocket_routes(
                                                 "messageId": message_id,
                                                 "content": content_text,
                                                 "agentName": agent_name_final,
+                                                "agentId": final_agent,  # Add agent_id for frontend
                                                 "metadata": {
                                                     "tokenCount": len(chunks),
                                                     "durationMs": duration_ms,

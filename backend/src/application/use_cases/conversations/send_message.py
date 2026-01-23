@@ -116,27 +116,49 @@ class SendMessageUseCase:
         }
         final_state = graph.invoke(initial_state)
 
-        selected_agent = final_state.get("selected_agent", domain.default_agent)
-        agent = bundle.agents.get(selected_agent)
-        if agent is None:
-            raise ValueError(f"Unknown agent_id: {selected_agent}")
+        # Use the agent that actually did the work (or checking persistent state)
+        # Verify if graph produced an assistant message
+        messages = final_state.get("messages", [])
+        last_message = messages[-1] if messages else None
+        
+        reply_text = ""
+        agent_id = domain.default_agent
 
-        reply_parts: list[str] = []
-        for chunk in self.llm.stream_chat(
-            model=agent.model_name,
-            system_prompt=agent.system_prompt,
-            messages=[{"role": "user", "content": request.message}],
-            temperature=agent.temperature,
-            max_tokens=agent.max_tokens,
-        ):
-            reply_parts.append(chunk)
-        reply_text = "".join(reply_parts)
-        messages = [
-            {"role": "user", "content": request.message},
-            {"role": "assistant", "content": reply_text},
-        ]
+        if last_message and last_message["role"] == "assistant":
+            # Graph executed the agent. Use its output.
+            reply_text = last_message["content"]
+            # Try to resolve which agent generated it. 
+            # In stateless execution, we might fallback to default if None
+            agent_id = final_state.get("selected_agent") or agent_id 
+        else:
+             # Fallback to old behavior (Graph was just a router)
+            selected_agent = final_state.get("selected_agent", domain.default_agent)
+            agent = bundle.agents.get(selected_agent)
+            if agent is None:
+                # Handle case where selected_agent is explicitly None
+                agent = bundle.agents.get(domain.default_agent)
+                selected_agent = domain.default_agent
+                
+            agent_id = selected_agent
+            
+            reply_parts: list[str] = []
+            for chunk in self.llm.stream_chat(
+                model=agent.model_name,
+                system_prompt=agent.system_prompt,
+                messages=[{"role": "user", "content": request.message}],
+                temperature=agent.temperature,
+                max_tokens=agent.max_tokens,
+            ):
+                reply_parts.append(chunk)
+            reply_text = "".join(reply_parts)
+            messages = [
+                {"role": "user", "content": request.message},
+                {"role": "assistant", "content": reply_text},
+            ]
 
         if self.conversation_repo is not None:
+             # Only add if not already in graph messages? 
+             # For now, just ensure we save what we return.
             self.conversation_repo.add_message(
                 Message(
                     id=str(uuid4()),
@@ -147,7 +169,7 @@ class SendMessageUseCase:
             )
         return SendMessageResponse(
             domain_id=request.domain_id,
-            agent_id=selected_agent,
+            agent_id=str(agent_id or domain.default_agent),
             conversation_id=conversation_id,
             reply=reply_text,
             messages=messages,
@@ -214,28 +236,47 @@ class SendMessageUseCase:
                 )
 
         final_state = last_state or initial_state
-        selected_agent_final = final_state.get("selected_agent", domain.default_agent)
-        agent = bundle.agents.get(selected_agent_final)
-        if agent is None:
-            raise ValueError(f"Unknown agent_id: {selected_agent_final}")
+        
+        # Check if graph produced valid output
+        messages = final_state.get("messages", [])
+        last_message = messages[-1] if messages else None
+        
+        reply_text = ""
+        final_agent_id = selected_agent or domain.default_agent # Use tracked agent from loop
 
-        reply_parts: list[str] = []
-        llm_messages = [{"role": "user", "content": request.message}]
-        for chunk in self.llm.stream_chat(
-            model=agent.model_name,
-            system_prompt=agent.system_prompt,
-            messages=llm_messages,
-            temperature=agent.temperature,
-            max_tokens=agent.max_tokens,
-        ):
-            reply_parts.append(chunk)
-            yield SendMessageStreamEvent(type="delta", text=chunk)
+        if last_message and last_message["role"] == "assistant":
+             # Graph executed the agent.
+             reply_text = last_message["content"]
+             # If we have the full text, we can't really stream it nicely event-by-event 
+             # unless we split it. For MVP, just emit one delta.
+             yield SendMessageStreamEvent(type="delta", text=reply_text)
+             
+        else:
+            # Fallback for Router-only graph
+            selected_agent_final = final_state.get("selected_agent") or selected_agent or domain.default_agent
+            agent = bundle.agents.get(selected_agent_final)
+            
+            # Additional safety check
+            if agent is None:
+                agent = bundle.agents.get(domain.default_agent)
+                selected_agent_final = domain.default_agent
 
-        reply_text = "".join(reply_parts)
-        messages = [
-            {"role": "user", "content": request.message},
-            {"role": "assistant", "content": reply_text},
-        ]
+            final_agent_id = selected_agent_final
+
+            reply_parts: list[str] = []
+            llm_messages = [{"role": "user", "content": request.message}]
+            for chunk in self.llm.stream_chat(
+                model=agent.model_name,
+                system_prompt=agent.system_prompt,
+                messages=llm_messages,
+                temperature=agent.temperature,
+                max_tokens=agent.max_tokens,
+            ):
+                reply_parts.append(chunk)
+                yield SendMessageStreamEvent(type="delta", text=chunk)
+
+            reply_text = "".join(reply_parts)
+            messages.append({"role": "assistant", "content": reply_text})
 
         if self.conversation_repo is not None:
             self.conversation_repo.add_message(
@@ -254,7 +295,7 @@ class SendMessageUseCase:
             type="done",
             response=SendMessageResponse(
                 domain_id=request.domain_id,
-                agent_id=selected_agent_final,
+                agent_id=str(final_agent_id),
                 conversation_id=conversation_id,
                 reply=reply_text,
                 messages=messages,
