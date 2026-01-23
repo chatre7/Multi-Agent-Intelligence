@@ -17,6 +17,7 @@ from langgraph.graph import END, START, StateGraph
 from src.domain.entities.agent import Agent
 from src.domain.entities.domain_config import DomainConfig
 from src.infrastructure.config.exceptions import ConfigError
+from src.infrastructure.llm.streaming import llm_from_env
 
 
 class ChatMessage(TypedDict):
@@ -72,15 +73,30 @@ class ConversationGraphBuilder:
         def make_agent_node(agent: Agent):
             def run_agent(state: ConversationState) -> ConversationState:
                 messages = list(state.get("messages", []))
-                last_user_message = next(
-                    (
-                        msg["content"]
-                        for msg in reversed(messages)
-                        if msg["role"] == "user"
-                    ),
-                    "",
-                )
-                response_text = f"[{agent.name}] {last_user_message}".strip()
+                
+                # Create LLM adapter
+                llm = llm_from_env()
+                
+                # Format messages for the provider (role/content dicts)
+                llm_messages = [{"role": m["role"], "content": m["content"]} for m in messages]
+                
+                # Get model and prompt from agent
+                model = agent.model_name or "llama3.2"  # Fallback model
+                system_prompt = agent.system_prompt or "You are a helpful assistant."
+                
+                # Execute LLM (Collect all chunks as we are in a graph node)
+                response_chunks = []
+                for chunk in llm.stream_chat(
+                    model=model,
+                    system_prompt=system_prompt,
+                    messages=llm_messages,
+                    temperature=0.7,
+                    max_tokens=2000
+                ):
+                    response_chunks.append(chunk)
+                
+                response_text = "".join(response_chunks).strip()
+                
                 messages.append({"role": "assistant", "content": response_text})
                 return {**state, "messages": messages}
 

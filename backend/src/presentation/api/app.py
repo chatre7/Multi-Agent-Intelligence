@@ -227,7 +227,7 @@ def create_app() -> FastAPI:
     def health() -> dict[str, Any]:
         return {"ok": True}
 
-    @app.get("/health/details")
+    @app.get("/v1/health/details")
     def health_details(
         x_role: str | None = Header(default=None),
         authorization: str | None = Header(default=None),
@@ -253,7 +253,7 @@ def create_app() -> FastAPI:
             "version": "0.1.0",
         }
 
-    @app.get("/metrics")
+    @app.get("/v1/metrics")
     def metrics(
         x_role: str | None = Header(default=None),
         authorization: str | None = Header(default=None),
