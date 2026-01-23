@@ -10,6 +10,7 @@ import type {
   Agent,
   ToolRun,
 } from "../../domain/entities/types";
+import { resolveApiBaseUrl } from "../config/urls";
 
 export interface ApiResponse<T> {
   data?: T;
@@ -21,7 +22,7 @@ export class ApiClient {
   private client: AxiosInstance;
   private token: string | null = null;
 
-  constructor(baseURL = "http://localhost:8000/api/v1") {
+  constructor(baseURL = "/api/v1") {
     this.client = axios.create({
       baseURL,
       headers: {
@@ -161,6 +162,11 @@ export class ApiClient {
     return response.data;
   }
 
+  async getHealthDetails(): Promise<any> {
+    const response = await this.client.get("/health/details");
+    return response.data;
+  }
+
   async promoteAgent(agentId: string, newState: string): Promise<Agent> {
     const response = await this.client.post<Agent>(
       `/agents/${agentId}/promote`,
@@ -170,4 +176,4 @@ export class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient();
+export const apiClient = new ApiClient(resolveApiBaseUrl());

@@ -1,0 +1,31 @@
+# Frontend Production Dockerfile
+# Multi-stage build: build static files then serve via nginx
+
+# Stage 1: Build
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files first (for better caching)
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build for production
+RUN npm run build
+
+# Stage 2: Production image (output only)
+# Just outputs the built files - nginx will serve them
+FROM alpine:latest AS production
+
+WORKDIR /app
+
+# Copy built files from builder
+COPY --from=builder /app/dist ./dist
+
+# This image is just for extracting build artifacts
+CMD ["echo", "Build complete. Use dist/ folder."]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 from dataclasses import asdict
@@ -11,6 +12,8 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+logger = logging.getLogger(__name__)
 
 from src.application.use_cases.conversations import (
     SendMessageRequest,
@@ -85,6 +88,9 @@ def register_websocket_routes(
             jwt_config = JwtConfig(secret=os.getenv("AUTH_SECRET", "dev-secret"))
             token = parse_bearer(websocket.headers.get("authorization"))
             if not token:
+                token = websocket.query_params.get("token")
+
+            if not token:
                 await websocket.close(code=1008)
                 return
             try:
@@ -143,27 +149,56 @@ def register_websocket_routes(
 
     @app.websocket("/ws")
     async def multiplexer_socket(websocket: WebSocket) -> None:
-        # Auth gate: default is JWT mode, but this handler is used by both modes.
-        auth_mode = (os.getenv("AUTH_MODE", "jwt") or "jwt").lower()
-        claims: dict[str, Any] = {}
-        role = "user"
-        subject = ""
-        perms = permissions_for_role(role)
-        if auth_mode == "jwt":
-            jwt_config = JwtConfig(secret=os.getenv("AUTH_SECRET", "dev-secret"))
-            token = parse_bearer(websocket.headers.get("authorization"))
-            if not token:
-                await websocket.close(code=1008)
-                return
-            try:
-                claims = get_claims_from_token(token, config=jwt_config)
-                subject = str(claims.get("sub", ""))
-                role = str(claims.get("role", "user")).lower()
-                perms = parse_permissions(claims.get("perms"))
-            except PermissionError:
-                await websocket.close(code=1008)
-                return
-        await websocket.accept()
+        logger.info("WebSocket handler invoked")
+        socket_key = None
+        try:
+            # Auth gate: default is JWT mode, but this handler is used by both modes.
+            auth_mode = (os.getenv("AUTH_MODE", "jwt") or "jwt").lower()
+            logger.debug(f"WebSocket auth_mode={auth_mode}")
+            claims: dict[str, Any] = {}
+            role = "user"
+            subject = ""
+            perms = permissions_for_role(role)
+
+            if auth_mode == "jwt":
+                jwt_config = JwtConfig(secret=os.getenv("AUTH_SECRET", "dev-secret"))
+                # Try header first, then query param
+                token = parse_bearer(websocket.headers.get("authorization"))
+                if not token:
+                    token = websocket.query_params.get("token")
+                    logger.debug("Token from query params")
+                else:
+                    logger.debug("Token from Authorization header")
+
+                if not token:
+                    logger.warning("WebSocket no token provided")
+                    await websocket.close(code=1008)
+                    return
+                try:
+                    # We need to manually validate token here since we don't have Depends checks in WS
+                    claims = get_claims_from_token(token, config=jwt_config)
+                    subject = str(claims.get("sub", ""))
+                    role = str(claims.get("role", "user")).lower()
+                    perms = parse_permissions(claims.get("perms"))
+                    logger.debug(f"WebSocket auth success: role={role}, subject={subject}")
+                except PermissionError as exc:
+                    logger.error(f"WebSocket auth token validation failed: {exc}")
+                    await websocket.close(code=1008)
+                    return
+                except Exception as exc:
+                    logger.error(f"WebSocket auth unexpected error: {exc}", exc_info=True)
+                    await websocket.close(code=1008)
+                    return
+
+            logger.info("WebSocket accepting connection")
+            await websocket.accept()
+            logger.info("WebSocket connection accepted")
+
+            socket_key = id(websocket)
+            logger.info(f"WebSocket socket_key={socket_key}")
+        except Exception as exc:
+            logger.error(f"WebSocket setup failed: {exc}", exc_info=True)
+            return
         send_lock = asyncio.Lock()
 
         async def ws_send(payload: dict[str, Any]) -> None:
@@ -194,8 +229,18 @@ def register_websocket_routes(
 
         try:
             while True:
-                payload: dict[str, Any] = await websocket.receive_json()
+                try:
+                    payload: dict[str, Any] = await websocket.receive_json()
+                except WebSocketDisconnect:
+                    logger.info("WebSocket client disconnected normally")
+                    return
+                except Exception as exc:
+                    logger.error(f"WebSocket receive JSON failed: {exc}", exc_info=True)
+                    return  # Don't raise - just close gracefully
                 event_type = str(payload.get("type", "")).strip()
+                if event_type == "PING":
+                    await ws_send({"type": "PONG"})
+                    continue
 
                 if event_type == "start_conversation":
                     try:
@@ -1053,6 +1098,7 @@ def register_websocket_routes(
                 )
 
         except WebSocketDisconnect:
+            logger.info("WebSocket client disconnected")
             # Cancel any in-flight streams for this connection.
             prefix = f"{id(websocket)}:"
             for key, task in list(_STREAM_TASKS.items()):
@@ -1064,5 +1110,9 @@ def register_websocket_routes(
                 sockets.discard(socket_key)
                 if not sockets:
                     _CONVERSATION_SOCKETS.pop(convo_id, None)
+            _SOCKET_SENDERS.pop(socket_key, None)
+            return
+        except Exception as exc:
+            logger.error(f"WebSocket handler exception: {exc}", exc_info=True)
             _SOCKET_SENDERS.pop(socket_key, None)
             return

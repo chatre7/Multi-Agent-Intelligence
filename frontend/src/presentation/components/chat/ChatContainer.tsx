@@ -9,6 +9,7 @@ import { apiClient } from "../../../infrastructure/api/apiClient";
 import type { Message } from "../../../domain/entities/types";
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
+import { resolveWsEndpointUrl } from "../../../infrastructure/config/urls";
 
 interface ChatContainerProps {
   conversationId?: string;
@@ -29,26 +30,33 @@ export default function ChatContainer({
     const initWebSocket = async () => {
       try {
         setIsConnecting(true);
-        const wsUrl = `ws://localhost:8000/ws/chat/${conversationId || "new"}`;
+        // Supports nginx (/ws) and direct backend (ws://localhost:8000[/ws])
+        const wsUrl = resolveWsEndpointUrl();
+        // DIRECT CONNECT DEBUG
+        // const wsUrl = `ws://${window.location.hostname}:8000/ws`;
+        console.log("[ChatContainer] Connecting to:", wsUrl);
+        console.log("[ChatContainer] Token:", token ? `present (${token.substring(0, 20)}...)` : "MISSING!");
+
         wsRef.current = new WebSocketClient({
           url: wsUrl,
           token,
         });
 
-        wsRef.current.on("MESSAGE_CHUNK", (data) => {
+        wsRef.current.on("message_chunk", (data) => {
           store.appendMessageDelta(data.chunk || "");
         });
 
-        wsRef.current.on("MESSAGE_COMPLETE", () => {
+        wsRef.current.on("message_complete", () => {
           store.setIsStreaming(false);
         });
 
-        wsRef.current.on("TOOL_APPROVAL_REQUIRED", (data) => {
+        wsRef.current.on("tool_approval_required", (data) => {
           console.log("Tool approval required:", data);
           // Handle tool approval UI
         });
 
-        wsRef.current.on("ERROR", (data) => {
+        wsRef.current.on("error", (data) => {
+          console.error("[ChatContainer] WebSocket Error Event:", data);
           store.setError(data.error || "An error occurred");
           store.setIsStreaming(false);
         });
@@ -59,16 +67,17 @@ export default function ChatContainer({
         // Load existing conversation if ID provided
         if (conversationId) {
           try {
-            const conversation =
-              await apiClient.getConversation(conversationId);
+            const conversation = await apiClient.getConversation(conversationId);
             store.setCurrentConversation(conversation);
           } catch (error) {
             console.error("Failed to load conversation:", error);
           }
         }
       } catch (error) {
-        console.error("WebSocket connection failed:", error);
-        store.setError("Failed to connect to chat service");
+        console.error("WebSocket connection exception:", error);
+        store.setError(
+          error instanceof Error ? error.message : "Failed to connect to chat service",
+        );
         setIsConnecting(false);
       }
     };
@@ -80,7 +89,8 @@ export default function ChatContainer({
     return () => {
       wsRef.current?.disconnect();
     };
-  }, [conversationId, token, store]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, token]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -104,11 +114,13 @@ export default function ChatContainer({
     // Send via WebSocket
     store.setIsStreaming(true);
     wsRef.current.send({
-      type: "SEND_MESSAGE",
-      data: {
-        message: content,
+      type: "send_message",
+      // @ts-ignore - Backend expects specific structure
+      conversationId: conversationId,
+      payload: {
+        content: content,
       },
-    });
+    } as any);
 
     // Add assistant message placeholder
     const assistantMessage: Message = {

@@ -37,4 +37,5 @@ class Conversation:
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "metadata": dict(self.metadata),
+            "messages": [],  # Default empty messages for frontend compatibility
         }

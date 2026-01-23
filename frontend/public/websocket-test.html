@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>WebSocket Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .disconnect-btn {
+            background: #dc3545;
+        }
+        .disconnect-btn:hover {
+            background: #c82333;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log {
+            margin: 5px 0;
+            padding: 8px;
+            border-left: 3px solid #666;
+            background: white;
+        }
+        .log.info {
+            border-color: #17a2b8;
+            color: #17a2b8;
+        }
+        .log.success {
+            border-color: #28a745;
+            color: #28a745;
+        }
+        .log.error {
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+        .log.warning {
+            border-color: #ffc107;
+            color: #856404;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 WebSocket Connection Test</h1>
+
+        <div class="input-group">
+            <label>WebSocket URL:</label>
+            <input type="text" id="wsUrl" value="ws://localhost/ws">
+        </div>
+
+        <div class="input-group">
+            <label>Token (JWT):</label>
+            <textarea id="token" placeholder="Paste your JWT token here or leave blank to get from localStorage"></textarea>
+        </div>
+
+        <div>
+            <button id="connectBtn" onclick="connectWebSocket()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnectWebSocket()" disabled class="disconnect-btn">Disconnect</button>
+            <button onclick="sendPing()" id="pingBtn" disabled>Send PING</button>
+            <span id="status" class="status disconnected">Disconnected</span>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        let ws = null;
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            output.appendChild(logEntry);
+            output.scrollTop = output.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function updateStatus(status) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${status}`;
+            statusEl.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+
+        function updateButtons(connected) {
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('pingBtn').disabled = !connected;
+        }
+
+        function connectWebSocket() {
+            const wsUrlInput = document.getElementById('wsUrl').value.trim();
+            let tokenInput = document.getElementById('token').value.trim();
+
+            // Get token from localStorage if not provided
+            if (!tokenInput) {
+                tokenInput = localStorage.getItem('auth_token') || localStorage.getItem('token') || '';
+                if (tokenInput) {
+                    log(`Using token from localStorage: ${tokenInput.substring(0, 20)}...`, 'info');
+                } else {
+                    log('No token provided and none found in localStorage (checked: auth_token, token)!', 'warning');
+                }
+            }
+
+            // Build WebSocket URL with token
+            const url = new URL(wsUrlInput, window.location.href);
+            url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+
+            if (tokenInput) {
+                url.searchParams.set('token', tokenInput);
+            }
+
+            const finalUrl = url.toString();
+
+            log(`🔌 Attempting to connect to: ${finalUrl.replace(/token=[^&]+/, 'token=***')}`, 'info');
+            log(`📍 Full URL (with token): ${finalUrl}`, 'info');
+
+            updateStatus('connecting');
+
+            try {
+                ws = new WebSocket(finalUrl);
+
+                ws.onopen = () => {
+                    log('✅ WebSocket CONNECTED successfully!', 'success');
+                    updateStatus('connected');
+                    updateButtons(true);
+
+                    // Try sending a PING
+                    log('📤 Sending initial PING...', 'info');
+                    ws.send(JSON.stringify({type: 'PING'}));
+                };
+
+                ws.onerror = (error) => {
+                    log(`❌ WebSocket ERROR: ${error}`, 'error');
+                    console.error('WebSocket error:', error);
+                };
+
+                ws.onclose = (event) => {
+                    const reason = event.reason || 'n/a';
+                    const codeExplanation = getCloseCodeExplanation(event.code);
+
+                    log(`❌ WebSocket CLOSED: code=${event.code} (${codeExplanation}), reason="${reason}", clean=${event.wasClean}`, 'error');
+
+                    updateStatus('disconnected');
+                    updateButtons(false);
+                };
+
+                ws.onmessage = (event) => {
+                    log(`📨 Received message: ${event.data}`, 'success');
+
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`📦 Parsed: ${JSON.stringify(data, null, 2)}`, 'info');
+                    } catch (e) {
+                        // Not JSON
+                    }
+                };
+
+            } catch (error) {
+                log(`❌ Failed to create WebSocket: ${error.message}`, 'error');
+                updateStatus('disconnected');
+                updateButtons(false);
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                log('🔌 Manually disconnecting...', 'info');
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function sendPing() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const message = JSON.stringify({type: 'PING'});
+                log(`📤 Sending: ${message}`, 'info');
+                ws.send(message);
+            } else {
+                log('❌ WebSocket is not connected!', 'error');
+            }
+        }
+
+        function getCloseCodeExplanation(code) {
+            const codes = {
+                1000: 'Normal Closure',
+                1001: 'Going Away',
+                1002: 'Protocol Error',
+                1003: 'Unsupported Data',
+                1005: 'No Status Received',
+                1006: 'Abnormal Closure - likely network/proxy/backend unreachable',
+                1007: 'Invalid Frame Payload Data',
+                1008: 'Policy Violation - likely auth failed (missing/invalid token)',
+                1009: 'Message Too Big',
+                1010: 'Mandatory Extension',
+                1011: 'Internal Server Error',
+                1015: 'TLS Handshake'
+            };
+            return codes[code] || 'Unknown';
+        }
+
+        // Initial log
+        log('🚀 WebSocket Test Tool Ready', 'info');
+        log('📝 Instructions:', 'info');
+        log('1. Login to http://localhost first to get token in localStorage', 'info');
+        log('2. Or paste your JWT token in the Token field', 'info');
+        log('3. Click "Connect" to test WebSocket connection', 'info');
+        log('4. Check console logs for detailed debugging', 'info');
+    </script>
+</body>
+</html>

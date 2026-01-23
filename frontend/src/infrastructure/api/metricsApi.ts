@@ -107,7 +107,7 @@ export async function fetchMetrics(): Promise<MetricsData> {
  */
 export async function fetchHealthDetails(): Promise<HealthDetails> {
   try {
-    const response = await apiClient.getHealth();
+    const response = await apiClient.getHealthDetails();
     return response as HealthDetails;
   } catch (error) {
     console.error('Failed to fetch health details:', error);

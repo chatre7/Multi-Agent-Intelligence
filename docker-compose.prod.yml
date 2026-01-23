@@ -1,0 +1,61 @@
+# Production Docker Compose
+# Frontend is built as static files and served by nginx
+
+services:
+  # Backend API (FastAPI + Python)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mai-backend
+    # ports:
+    #   - "8000:8000"  # Only expose via nginx in production
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - DATABASE_PATH=/app/data/checkpoints.db
+      - LOG_LEVEL=INFO
+      # Authentication
+      - AUTH_MODE=jwt
+      - AUTH_SECRET=dev-secret-key-change-in-production
+      - AUTH_USERS=admin:admin:admin;dev:dev:developer;user:user:user
+    volumes:
+      - ./backend:/app
+      - backend_data:/app/data
+      - backend_logs:/app/logs
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - mai-network
+    restart: unless-stopped
+    command: >
+      sh -c "pip install -e . &&
+             python -m uvicorn src.presentation.api.app:create_app --host 0.0.0.0 --port 8000 --reload"
+
+  # Nginx + Frontend (static build)
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile.prod
+    container_name: mai-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - mai-network
+    restart: unless-stopped
+
+networks:
+  mai-network:
+    driver: bridge
+
+volumes:
+  backend_data:
+    driver: local
+  backend_logs:
+    driver: local

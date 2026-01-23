@@ -5,56 +5,24 @@
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-green)
 ![Backend Tests](https://img.shields.io/badge/Backend%20Tests-119%2F119%20passing-green)
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019%2BVite-blue)
-![Admin Panel](https://img.shields.io/badge/Admin%20Panel-Complete-brightgreen)
+![Docker](https://img.shields.io/badge/Docker-Production%20Ready-blue)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 
-## ⚠️ Breaking Changes (v1.0.0 - Phase 6)
+---
 
-### Admin Panel API Changes
-- **NEW**: Admin panel endpoints now require `ADMIN` role
-- **DEPRECATED**: Old placeholder admin endpoints removed
-- **NEW**: Real-time metrics endpoints: `GET /metrics`, `GET /health/details`
-- **NEW**: Agent promotion endpoint: `POST /v1/agents/{id}/promote`
-- **NEW**: Tool approval endpoints: `POST /v1/tool-runs/{id}/approve`, `POST /v1/tool-runs/{id}/reject`
+## 📋 Table of Contents
 
-### Frontend Component Changes
-- **NEW**: 12 new admin components (StatCard, MetricsChart, ActivityFeed, DomainList, etc.)
-- **REMOVED**: Old placeholder AdminPage component
-- **NEW**: Admin tabs: Overview, Domains, Agents, Tools, Settings (placeholder for Phase 7)
-- **UPDATED**: App.tsx navigation now includes Admin Panel button
-
-### Store Changes
-- **NEW**: `metricsStore.ts` - Zustand store for metrics with auto-refresh (5-second interval)
-- **NEW**: API client extended with `promoteAgent()`, `fetchMetrics()`, `fetchHealthDetails()`
-- **UPDATED**: All stores now handle real-time data refresh
-
-### Database Schema (No Changes)
-- ✅ Backward compatible - existing SQLite databases work without migration
-- ✅ New metrics calculated on-the-fly from existing tables
-
-### Migration Guide
-
-**For Backend:**
-```bash
-# No database migration needed
-# Existing checkpoints.db is fully compatible
-cd backend
-python -m uvicorn src.presentation.api.app:create_app --reload
-```
-
-**For Frontend:**
-```bash
-# Fresh install recommended (new dependencies)
-cd frontend
-rm -rf node_modules dist
-npm install
-npm run dev
-```
-
-**For Deployment:**
-- Update any reverse proxy rules for new `/metrics` endpoint
-- Ensure admin users have `ADMIN` role in auth system
-- Clear browser cache to avoid stale components (Ctrl+Shift+R)
+- [Overview](#-overview)
+- [Quick Start](#-quick-start)
+  - [Development Mode](#development-mode)
+  - [Production Mode (Docker)](#production-mode-docker)
+- [Architecture](#-architecture)
+- [API Reference](#-api-reference)
+- [WebSocket Protocol](#-websocket-protocol)
+- [Configuration](#-configuration)
+- [Testing](#-testing)
+- [Troubleshooting](#-troubleshooting)
+- [License](#-license)
 
 ---
 
@@ -71,88 +39,43 @@ Transform complex multi-agent orchestration into a **configuration-driven platfo
 
 ✅ **Production-Ready Backend**
 - Clean Architecture (Domain → Application → Infrastructure → Presentation)
-- Test-Driven Development (119/119 tests passing)
-- Full REST API with 20+ endpoints
+- Test-Driven Development (119+ tests passing)
+- Full REST API with 25+ endpoints
 - Real-time WebSocket streaming
 - JWT + RBAC authentication
 
 ✅ **Modern Frontend**
-- React 19 + TypeScript + TailwindCSS
+- React 19 + TypeScript + Vite
 - Zustand state management
 - Real-time chat with streaming
-- Domain/Agent selector
-- **Admin panel with metrics dashboard** ✨ (NEW - Phase 6)
+- Admin panel with metrics dashboard
 
 ✅ **Multi-Agent Orchestration**
 - LangGraph-based agent coordination
 - Supervisor pattern with intelligent routing
 - Human-in-the-loop tool approval
-- Version management (DEVELOPMENT → TESTING → PRODUCTION → DEPRECATED → ARCHIVED)
+- Version management (DEVELOPMENT → TESTING → PRODUCTION)
 
 ---
 
-## 📋 Quick Links
-
-- 🚀 **[Quick Start Guide](./QUICKSTART.md)** - Get running in 5 minutes
-- 📊 **[Implementation Summary](./IMPLEMENTATION_SUMMARY.md)** - Detailed architecture & status
-- 📈 **[Phase 6 Complete](./PHASE_6_COMPLETE.md)** - Admin Panel implementation details
-- 🔧 **[Backend README](./backend/README.md)** - Backend setup & development
-- ⚛️ **[Frontend README](./frontend/README.md)** - Frontend setup & components
-
----
-
-## 🏆 Achievements
-
-### Phase 6 Admin Panel ✨ (NEW)
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Metrics Dashboard | ✅ Complete | 4 KPI cards, distribution chart, health panel |
-| Domain Management | ✅ Complete | List, search, detail view, agent display |
-| Agent Management | ✅ Complete | List, filter, detail view, state promotion |
-| Tool Approval | ✅ Complete | Pending queue, approve/reject modal, reason input |
-| Activity Feed | ✅ Complete | Real-time updates, status indicators, timestamps |
-| Auto-Refresh | ✅ Complete | 5-second configurable intervals with cleanup |
-| Admin Components | ✅ Complete | 12 new React components (0 TypeScript errors) |
-
-### Backend Implementation ✅
-
-| Component | Status | Tests | Notes |
-|-----------|--------|-------|-------|
-| Domain Entities | ✅ Complete | 40/40 | Agent, Domain, Tool, Value Objects |
-| Repository Pattern | ✅ Complete | 15/15 | SQLite + In-Memory implementations |
-| Use Cases | ✅ Complete | 30/30 | Agent, Domain, Conversation, Tool CRUD |
-| REST API | ✅ Complete | 25/25 | 25+ endpoints with RBAC |
-| WebSocket Streaming | ✅ Complete | 15/15 | Real-time message + tool approval |
-| Auth & RBAC | ✅ Complete | 27/29 | JWT + 5 roles with permissions |
-| **Total** | **✅ COMPLETE** | **119/119** | **100% PASS RATE** |
-
-### Frontend Implementation ✅
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Login Page | ✅ Complete | JWT authentication with demo users |
-| Chat Page | ✅ Complete | Real-time streaming, domain/agent selection |
-| Admin Panel | ✅ Complete | 5 tabs, 12 components, real-time metrics |
-| Build | ✅ Complete | Production build (0 errors, 2718 modules) |
-
----
-
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Python 3.11+** - Backend runtime
-- **Node.js 18+** - Frontend runtime
-- **Ollama** - LLM provider
+- **Node.js 20+** - Frontend runtime (22+ recommended for Vite 7)
+- **Docker & Docker Compose** - For production deployment
+- **Ollama** (optional) - LLM provider
 
-### Quick Start (3 Steps)
+### Development Mode
+
+Run backend and frontend separately for hot-reload development:
 
 **1. Start Backend**
 ```bash
 cd backend
-pip install -r requirements.txt
-python -m uvicorn src.presentation.api.app:create_app --reload
+pip install -e .
+python -m uvicorn src.presentation.api.app:create_app --reload --port 8000
 ```
 
 **2. Start Frontend**
@@ -164,49 +87,353 @@ npm run dev
 
 **3. Open in Browser**
 - Navigate to `http://localhost:5173`
-- Login with: `admin:admin`
-- Click "Admin Panel" to access metrics dashboard ✨
+- Login with: `admin:admin` or `dev:dev` or `user:user`
+
+### Production Mode (Docker)
+
+Single command to build and run the entire stack:
+
+**Option 1: Development with hot-reload**
+```bash
+docker compose up -d --build
+# Access at http://localhost
+```
+
+**Option 2: Production (static frontend)**
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+# Access at http://localhost
+```
+
+**Useful Docker Commands:**
+```bash
+# View logs
+docker logs mai-backend -f
+docker logs mai-nginx -f
+
+# Rebuild single service
+docker compose -f docker-compose.prod.yml up -d --build nginx
+
+# Stop all
+docker compose -f docker-compose.prod.yml down
+
+# Stop and remove volumes
+docker compose -f docker-compose.prod.yml down -v
+```
 
 ---
 
-## 📊 Phase 6 Highlights
+## 🏗️ Architecture
 
-### Metrics Dashboard (Overview Tab)
-- 4 KPI cards: Domains, Agents, Conversations, Pending Tools
-- Distribution chart: Tool run status breakdown (approved/rejected/pending)
-- System health panel: Auth mode, DB type, version info
-- Activity feed: Recent tool runs and conversations
-- Auto-refresh: Every 5 seconds (configurable)
+### Production Deployment
 
-### Domain Management (Domains Tab)
-- List all domains with agent count
-- Search and filter by name
-- Click to view domain details (right panel)
-- Displays agents, routing rules, metadata
+```
+┌─────────────────────────────────────────────────────────┐
+│                      Browser                             │
+│                   http://localhost                       │
+└────────────────────────┬────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│                   nginx (port 80)                        │
+│  ┌─────────────┬─────────────┬─────────────────────┐    │
+│  │     /       │   /api/*    │        /ws          │    │
+│  │   Static    │   REST API  │     WebSocket       │    │
+│  │   React     │   Proxy     │      Proxy          │    │
+│  └──────┬──────┴──────┬──────┴──────────┬──────────┘    │
+└─────────┼─────────────┼─────────────────┼───────────────┘
+          │             │                 │
+          ▼             ▼                 ▼
+┌─────────────────────────────────────────────────────────┐
+│                Backend (FastAPI, port 8000)              │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  Presentation   (REST API, WebSocket handlers)   │    │
+│  ├─────────────────────────────────────────────────┤    │
+│  │  Application    (Use Cases, Business Logic)      │    │
+│  ├─────────────────────────────────────────────────┤    │
+│  │  Domain         (Entities, Value Objects)        │    │
+│  ├─────────────────────────────────────────────────┤    │
+│  │  Infrastructure (SQLite, LLM, Repositories)      │    │
+│  └─────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────┘
+```
 
-### Agent Management (Agents Tab)
-- List all agents with version and state
-- Filter by domain and state
-- Click to view agent details
-- Promote agent through lifecycle (DEV → TEST → PROD → DEPRECATED → ARCHIVED)
-- Color-coded state badges
+### Directory Structure
 
-### Tool Approval (Tools Tab)
-- List pending tool runs
-- Filter by status (pending/approved/rejected/executed)
-- Inline approve/reject buttons
-- Approval modal with parameters and rejection reason
+```
+Multi-Agent-Intelligence/
+├── backend/                    # FastAPI Backend
+│   ├── src/
+│   │   ├── domain/            # Entities, Value Objects
+│   │   ├── application/       # Use Cases
+│   │   ├── infrastructure/    # Repositories, LLM
+│   │   └── presentation/      # API, WebSocket
+│   ├── tests/                 # Unit & Integration Tests
+│   └── config/                # YAML Configurations
+│       ├── domains/           # Domain definitions
+│       ├── agents/            # Agent definitions
+│       └── tools/             # Tool definitions
+│
+├── frontend/                   # React Frontend
+│   ├── src/
+│   │   ├── domain/            # Types, Entities
+│   │   ├── infrastructure/    # API Client, WebSocket, Stores
+│   │   └── presentation/      # Components, Pages
+│   └── dist/                  # Production build
+│
+├── nginx/                      # Nginx Configuration
+│   ├── nginx.conf             # Development config
+│   ├── nginx.prod.conf        # Production config
+│   ├── Dockerfile             # Development Dockerfile
+│   └── Dockerfile.prod        # Production Dockerfile
+│
+├── docs/                       # Documentation
+│   └── WEBSOCKET_PROTOCOL.md  # WebSocket message reference
+│
+├── docker-compose.yml          # Development compose
+├── docker-compose.prod.yml     # Production compose
+└── README.md                   # This file
+```
+
+---
+
+## 📡 API Reference
+
+### Authentication
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/auth/login` | POST | Login with username/password |
+| `/v1/auth/me` | GET | Get current user info |
+
+**Login Request:**
+```json
+POST /v1/auth/login
+{
+  "username": "admin",
+  "password": "admin"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJ...",
+  "token_type": "bearer",
+  "role": "admin"
+}
+```
+
+### Domains & Agents
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/domains` | GET | List all domains |
+| `/v1/domains/{id}` | GET | Get domain details |
+| `/v1/agents` | GET | List all agents |
+| `/v1/agents/{id}` | GET | Get agent details |
+| `/v1/tools` | GET | List all tools |
+
+### Conversations
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/conversations` | GET | List conversations |
+| `/v1/conversations` | POST | Create conversation |
+| `/v1/conversations/{id}` | GET | Get conversation details |
+| `/v1/conversations/{id}/messages` | GET | Get messages |
+| `/v1/chat` | POST | Send message (REST) |
+
+### Health & Metrics
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Basic health check |
+| `/health/details` | GET | Detailed health info |
+| `/metrics` | GET | Prometheus metrics |
+
+---
+
+## 🔌 WebSocket Protocol
+
+### Connection
+
+```javascript
+const token = localStorage.getItem('auth_token');
+const ws = new WebSocket(`ws://localhost/ws?token=${token}`);
+```
+
+### Messages
+
+**Start Conversation:**
+```json
+{
+  "type": "start_conversation",
+  "payload": { "domainId": "software_development" }
+}
+```
+
+**Send Message:**
+```json
+{
+  "type": "send_message",
+  "conversationId": "uuid",
+  "payload": { "content": "Hello" }
+}
+```
+
+**Receive Streaming Response:**
+```json
+{ "type": "message_chunk", "payload": { "chunk": "Hello" } }
+{ "type": "message_chunk", "payload": { "chunk": " world" } }
+{ "type": "message_complete", "payload": { "content": "Hello world" } }
+```
+
+**Keep-Alive:**
+```json
+// Client sends
+{ "type": "PING" }
+
+// Server responds
+{ "type": "PONG" }
+```
+
+📖 Full protocol documentation: [docs/WEBSOCKET_PROTOCOL.md](./docs/WEBSOCKET_PROTOCOL.md)
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+**Backend (`docker-compose.yml`):**
+```yaml
+environment:
+  - AUTH_MODE=jwt                    # jwt | none
+  - AUTH_SECRET=your-secret-key      # JWT signing secret
+  - AUTH_USERS=admin:admin:admin     # username:password:role
+  - DATABASE_PATH=/app/data/db.db    # SQLite path
+  - LOG_LEVEL=INFO                   # DEBUG | INFO | WARNING
+  - OLLAMA_BASE_URL=http://localhost:11434  # LLM endpoint
+```
+
+**Frontend (`docker-compose.yml`):**
+```yaml
+environment:
+  - VITE_API_BASE_URL=/api           # API prefix
+  - VITE_WS_URL=/ws                  # WebSocket prefix
+  - BACKEND_HOST=backend             # Docker network hostname
+```
+
+### Default Users
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin | admin | admin |
+| dev | dev | developer |
+| user | user | user |
+
+---
+
+## 🧪 Testing
+
+### Backend Tests
+
+```bash
+cd backend
+
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=src --cov-report=html
+
+# Run specific test file
+pytest tests/unit/presentation/test_websocket_connection.py -v
+```
+
+### Frontend Tests
+
+```bash
+cd frontend
+
+# Type checking
+npm run type-check
+
+# Linting
+npm run lint
+
+# Build check
+npm run build
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### WebSocket Connection Fails (Code 1006)
+
+**Symptoms:** `WebSocket closed before open (code=1006)`
+
+**Solutions:**
+1. Verify nginx is running: `docker logs mai-nginx`
+2. Check nginx config has WebSocket upgrade map
+3. Access via `http://localhost` not `http://localhost:5173`
+4. Verify token is valid: check browser localStorage
+
+### 404 on API Requests
+
+**Check nginx logs:**
+```bash
+docker logs mai-nginx | grep "api"
+```
+
+**Verify backend is healthy:**
+```bash
+curl http://localhost/api/v1/health
+```
+
+### Container Won't Start
+
+```bash
+# Check logs
+docker logs mai-backend
+docker logs mai-nginx
+
+# Rebuild from scratch
+docker compose -f docker-compose.prod.yml down -v
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+### Port Already in Use
+
+```bash
+# Find process using port 80
+netstat -ano | findstr :80
+
+# Kill process (Windows)
+taskkill /PID <PID> /F
+```
 
 ---
 
 ## 📄 License
 
-MIT License - See LICENSE file for details
+MIT License - See [LICENSE](./LICENSE) file for details
 
 ---
 
-**Status**: ✅ Production Ready (Phase 6 Complete)
-**Last Updated**: January 22, 2026
-**Version**: 1.0.0 (Phase 6)
+## 📚 Additional Documentation
 
-👉 **[Quick Start Guide](./QUICKSTART.md)** - Get running in 5 minutes!
+- 📖 **[Quick Start Guide](./QUICKSTART.md)** - Detailed setup instructions
+- 🔌 **[WebSocket Protocol](./docs/WEBSOCKET_PROTOCOL.md)** - Full message reference
+- 🏗️ **[Implementation Summary](./IMPLEMENTATION_SUMMARY.md)** - Architecture details
+- 🔧 **[Backend README](./backend/README.md)** - Backend development
+- ⚛️ **[Frontend README](./frontend/README.md)** - Frontend development
+
+---
+
+**Status**: ✅ Production Ready  
+**Last Updated**: January 23, 2026  
+**Version**: 1.1.0
+

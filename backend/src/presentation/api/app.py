@@ -13,6 +13,8 @@ from passlib.hash import pbkdf2_sha256
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
 
+from src.domain.entities.conversation import Conversation
+
 from src.application.use_cases.conversations import (
     SendMessageRequest,
     SendMessageUseCase,
@@ -101,6 +103,11 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
 
 
+class ConversationCreateRequest(BaseModel):
+    domain_id: str = Field(..., min_length=1)
+    agent_id: str = Field(..., min_length=1)
+
+
 class RegistryAgentCreateRequest(BaseModel):
     id: str = Field(..., min_length=1)
     name: str = Field(..., min_length=1)
@@ -163,7 +170,17 @@ def create_app() -> FastAPI:
     list_registered_agents_uc = ListRegisteredAgentsUseCase(repo=registered_agent_repo)
     get_registered_agent_uc = GetRegisteredAgentUseCase(repo=registered_agent_repo)
 
+    from fastapi.middleware.cors import CORSMiddleware
+
     app = FastAPI(title="Multi-Agent Backend", version="0.1.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     auth_mode = (os.getenv("AUTH_MODE", "jwt") or "jwt").lower()
     jwt_config = JwtConfig(secret=os.getenv("AUTH_SECRET", "dev-secret"))
@@ -640,6 +657,28 @@ def create_app() -> FastAPI:
 
         return asdict(response)
 
+    @app.get("/v1/conversations/{conversation_id}")
+    def get_conversation(
+        conversation_id: str,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            require_permission_set(perms, Permission.CHAT_READ)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        convo = conversation_repo.get_conversation(conversation_id)
+        if convo is None:
+            raise HTTPException(status_code=404, detail="Unknown conversation_id")
+        if (
+            role not in {"admin", "developer"}
+            and convo.created_by_sub
+            and convo.created_by_sub != sub
+        ):
+            raise HTTPException(status_code=404, detail="Unknown conversation_id")
+        return convo.to_dict()
+
     @app.get("/v1/conversations/{conversation_id}/messages")
     def list_conversation_messages(
         conversation_id: str,
@@ -663,6 +702,30 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Unknown conversation_id")
         messages = conversation_repo.list_messages(conversation_id, limit=limit)
         return [m.to_dict() for m in messages]
+
+    @app.post("/v1/conversations")
+    def start_conversation(
+        payload: ConversationCreateRequest,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            require_permission_set(perms, Permission.CHAT_SEND)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        from uuid import uuid4
+        conversation_id = str(uuid4())
+        convo = Conversation(
+            id=conversation_id,
+            domain_id=payload.domain_id,
+            created_by_role=role,
+            created_by_sub=sub,
+            title=f"Chat with {payload.agent_id}",
+        )
+        conversation_repo.create_conversation(convo)
+        return convo.to_dict()
 
     @app.get("/v1/conversations")
     def list_conversations(

@@ -63,27 +63,27 @@ export default function AdminPage() {
 
   const chartData = metrics
     ? [
-        {
-          label: "Requested",
-          value: metrics.toolRunsRequested,
-          color: "#3b82f6",
-        },
-        {
-          label: "Approved",
-          value: metrics.toolRunsApproved,
-          color: "#10b981",
-        },
-        {
-          label: "Rejected",
-          value: metrics.toolRunsRejected,
-          color: "#ef4444",
-        },
-        {
-          label: "Executed",
-          value: metrics.toolRunsExecuted,
-          color: "#8b5cf6",
-        },
-      ]
+      {
+        label: "Requested",
+        value: metrics.toolRunsRequested,
+        color: "#3b82f6",
+      },
+      {
+        label: "Approved",
+        value: metrics.toolRunsApproved,
+        color: "#10b981",
+      },
+      {
+        label: "Rejected",
+        value: metrics.toolRunsRejected,
+        color: "#ef4444",
+      },
+      {
+        label: "Executed",
+        value: metrics.toolRunsExecuted,
+        color: "#8b5cf6",
+      },
+    ]
     : [];
 
   return (
@@ -135,11 +135,10 @@ export default function AdminPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${
-                    activeTab === tab.id
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:text-gray-700"
-                  }`}
+                    }`}
                 >
                   <Icon size={18} />
                   {tab.label}
@@ -250,19 +249,19 @@ export default function AdminPage() {
                         <div className="text-gray-600">
                           Domains:{" "}
                           <span className="font-semibold">
-                            {health.config_counts.domains}
+                            {health.config_counts?.domains ?? 0}
                           </span>
                         </div>
                         <div className="text-gray-600">
                           Agents:{" "}
                           <span className="font-semibold">
-                            {health.config_counts.agents}
+                            {health.config_counts?.agents ?? 0}
                           </span>
                         </div>
                         <div className="text-gray-600">
                           Tools:{" "}
                           <span className="font-semibold">
-                            {health.config_counts.tools}
+                            {health.config_counts?.tools ?? 0}
                           </span>
                         </div>
                       </div>

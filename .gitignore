@@ -76,3 +76,23 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Docker
+.env
+.env.local
+docker-compose.override.yml
+
+# Frontend Build
+frontend/dist/
+frontend/.vite/
+
+# Node
+node_modules/
+
+# Nginx logs (when using volumes)
+nginx/logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
