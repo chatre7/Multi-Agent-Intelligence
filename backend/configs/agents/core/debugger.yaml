@@ -17,7 +17,7 @@ capabilities:
   - root_cause_analysis
 tools:
   - file_read
-model_name: "gpt-oss:20b-cloud"
+model_name: "qwen3:4b"
 temperature: 0.1
 max_tokens: 2048
 timeout_seconds: 90

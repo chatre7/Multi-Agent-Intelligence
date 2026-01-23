@@ -511,13 +511,40 @@ def register_websocket_routes(
                                 if event.type == "agent_selected" and event.agent_id:
                                     bundle = chat_use_case.loader.load_bundle()
                                     agent = bundle.agents.get(event.agent_id)
-                                    agent_name = agent.name if agent else event.agent_id
+                                    new_agent_name = agent.name if agent else event.agent_id
+                                    
+                                    # Detect handoff (agent change)
+                                    if agent_name and agent_name != new_agent_name:
+                                        await ws_send({
+                                            "type": "workflow_handoff",
+                                            "conversationId": conversation_id,
+                                            "payload": {
+                                                "fromAgent": agent_name,
+                                                "toAgent": new_agent_name,
+                                                "fromAgentId": getattr(event, 'previous_agent_id', agent_name),
+                                                "toAgentId": event.agent_id,
+                                                "reason": "Agent handoff detected",
+                                                "timestamp": asyncio.get_event_loop().time(),
+                                            },
+                                        })
+                                    
+                                    agent_name = new_agent_name
                                     # Forward event to client
                                     await ws_send({
                                         "type": "agent_selected",
                                         "conversationId": conversation_id,
                                         "agent_id": event.agent_id,
                                         "agent_name": agent_name
+                                    })
+                                    # Emit workflow visualization event
+                                    await ws_send({
+                                        "type": "workflow_step_start",
+                                        "conversationId": conversation_id,
+                                        "payload": {
+                                            "agentId": event.agent_id,
+                                            "agentName": agent_name,
+                                            "timestamp": asyncio.get_event_loop().time(),
+                                        },
                                     })
                                 if event.type == "delta":
                                     chunk = event.text or ""
@@ -561,6 +588,17 @@ def register_websocket_routes(
                                             },
                                         }
                                     )
+                                    # Emit workflow step complete for visualization
+                                    await ws_send({
+                                        "type": "workflow_step_complete",
+                                        "conversationId": conversation_id,
+                                        "payload": {
+                                            "agentId": final_agent,
+                                            "agentName": agent_name_final,
+                                            "durationMs": duration_ms,
+                                            "tokenCount": len(chunks),
+                                        },
+                                    })
                                     return
                         except asyncio.CancelledError:
                             await ws_error(

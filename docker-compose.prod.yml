@@ -21,7 +21,10 @@ services:
       - LLM_PROVIDER=openai
       - OPENAI_BASE_URL=http://host.docker.internal:11434/v1
       - OPENAI_API_KEY=ollama
-      - LLM_MODEL=gpt-oss:20b-cloud
+      - LLM_MODEL=qwen3:4b
+      # Persistence
+      - CONVERSATION_REPO=sqlite
+      - CONVERSATION_DB=/app/data/conversations.db
     volumes:
       - ./backend:/app
       - ./backend/data:/app/data

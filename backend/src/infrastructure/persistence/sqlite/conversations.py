@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
@@ -9,6 +10,7 @@ from datetime import datetime
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
 from src.domain.repositories.conversation_repository import IConversationRepository
+from src.infrastructure.persistence.sqlite.schema import init_schema
 
 
 def _parse_iso(value: str) -> datetime:
@@ -30,10 +32,10 @@ class SqliteConversationRepository(IConversationRepository):
         if self._is_memory_uri():
             self._keepalive_conn = self._open_connection()
             self._keepalive_conn.execute("PRAGMA journal_mode=WAL")
-            self._init_schema(self._keepalive_conn)
+            init_schema(self._keepalive_conn)
         else:
             with self._connect() as conn:
-                self._init_schema(conn)
+                init_schema(conn)
 
     def _is_memory_uri(self) -> bool:
         return self.db_path.startswith("file:") and "mode=memory" in self.db_path
@@ -50,36 +52,6 @@ class SqliteConversationRepository(IConversationRepository):
         conn.row_factory = sqlite3.Row
         return conn
 
-    def _init_schema(self, conn: sqlite3.Connection) -> None:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS conversations (
-              id TEXT PRIMARY KEY,
-              domain_id TEXT NOT NULL,
-              created_by_role TEXT NOT NULL,
-              created_by_sub TEXT NOT NULL,
-              title TEXT,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS messages (
-              id TEXT PRIMARY KEY,
-              conversation_id TEXT NOT NULL,
-              role TEXT NOT NULL,
-              content TEXT NOT NULL,
-              created_at TEXT NOT NULL,
-              FOREIGN KEY(conversation_id) REFERENCES conversations(id)
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_messages_conv_created ON messages(conversation_id, created_at ASC, id ASC)"
-        )
-
     def close(self) -> None:
         if self._keepalive_conn is not None:
             try:
@@ -91,8 +63,8 @@ class SqliteConversationRepository(IConversationRepository):
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO conversations (id, domain_id, created_by_role, created_by_sub, title, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO conversations (id, domain_id, created_by_role, created_by_sub, title, created_at, updated_at, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     conversation.id,
@@ -102,6 +74,7 @@ class SqliteConversationRepository(IConversationRepository):
                     conversation.title,
                     conversation.created_at.isoformat(),
                     conversation.updated_at.isoformat(),
+                    json.dumps(conversation.metadata),
                 ),
             )
 
@@ -121,14 +94,15 @@ class SqliteConversationRepository(IConversationRepository):
             title=row["title"],
             created_at=_parse_iso(str(row["created_at"])),
             updated_at=_parse_iso(str(row["updated_at"])),
+            metadata=json.loads(row["metadata"]) if row["metadata"] else {},
         )
 
     def add_message(self, message: Message) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO messages (id, conversation_id, role, content, created_at)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO messages (id, conversation_id, role, content, created_at, metadata)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message.id,
@@ -136,6 +110,7 @@ class SqliteConversationRepository(IConversationRepository):
                     message.role,
                     message.content,
                     message.created_at.isoformat(),
+                    json.dumps(message.metadata),
                 ),
             )
             conn.execute(
@@ -161,6 +136,7 @@ class SqliteConversationRepository(IConversationRepository):
                 role=str(row["role"]),
                 content=str(row["content"]),
                 created_at=_parse_iso(str(row["created_at"])),
+                metadata=json.loads(row["metadata"]) if row["metadata"] else {},
             )
             for row in rows
         ]
@@ -208,6 +184,7 @@ class SqliteConversationRepository(IConversationRepository):
                 title=row["title"],
                 created_at=_parse_iso(str(row["created_at"])),
                 updated_at=_parse_iso(str(row["updated_at"])),
+                metadata=json.loads(row["metadata"]) if row["metadata"] else {},
             )
             for row in rows
         ]

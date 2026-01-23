@@ -70,6 +70,12 @@ export default function ChatContainer({
         setIsConnecting(false);
 
         if (conversationId) {
+          // Check if we already have this conversation loaded with messages
+          if (store.currentConversation?.id === conversationId && store.currentConversation.messages.length > 0) {
+            console.log("[ChatContainer] Conversation already loaded");
+            return;
+          }
+
           try {
             const conversation = await apiClient.getConversation(conversationId);
             store.setCurrentConversation(conversation);

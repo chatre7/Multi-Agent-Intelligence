@@ -165,6 +165,7 @@ class SendMessageUseCase:
                     conversation_id=conversation_id,
                     role="assistant",
                     content=reply_text,
+                    metadata={"agent_id": str(agent_id)},
                 )
             )
         return SendMessageResponse(
@@ -285,6 +286,7 @@ class SendMessageUseCase:
                     conversation_id=conversation_id,
                     role="assistant",
                     content=reply_text,
+                    metadata={"agent_id": str(final_agent_id)},
                 )
             )
 

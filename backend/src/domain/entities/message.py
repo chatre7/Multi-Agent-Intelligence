@@ -30,4 +30,5 @@ class Message:
             "content": self.content,
             "created_at": self.created_at.isoformat(),
             "metadata": dict(self.metadata),
+            "agent_id": self.metadata.get("agent_id"),
         }

@@ -21,7 +21,7 @@ capabilities:
   - wisdom_sharing
 tools:
   - transfer_to_agent
-model_name: "gpt-oss:20b-cloud"
+model_name: "qwen3:4b"
 temperature: 0.7
 max_tokens: 1024
 keywords: ["philosophy", "meaning", "wisdom"]

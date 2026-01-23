@@ -361,7 +361,7 @@ class ConversationGraphBuilder:
                     state["selected_agent"] = None
                     
                     try:
-                        model = os.getenv("LLM_MODEL", "gpt-oss:20b-cloud")
+                        model = os.getenv("LLM_MODEL", "qwen3:4b")
                         print(f"[DEBUG] Extracting facts using model: {model}")
                         new_facts = extract_facts(llm, model, messages)
                         if new_facts:
