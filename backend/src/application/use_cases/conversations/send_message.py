@@ -13,7 +13,9 @@ from uuid import uuid4
 
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
+from src.domain.entities.workflow_log import WorkflowLog
 from src.domain.repositories.conversation_repository import IConversationRepository
+from src.domain.repositories.workflow_log_repository import IWorkflowLogRepository
 from src.infrastructure.config import ConfigBundle, YamlConfigLoader
 from src.infrastructure.langgraph import ConversationGraphBuilder, ConversationState
 from src.infrastructure.llm import StreamingLLM
@@ -59,6 +61,7 @@ class SendMessageUseCase:
     graph_builder: ConversationGraphBuilder
     llm: StreamingLLM
     conversation_repo: IConversationRepository | None = None
+    workflow_log_repo: IWorkflowLogRepository | None = None
     _bundle_cache: ConfigBundle | None = None
     _bundle_cache_hash: str | None = None
 
@@ -114,7 +117,7 @@ class SendMessageUseCase:
             "domain_id": request.domain_id,
             "messages": [{"role": "user", "content": request.message}],
         }
-        final_state = graph.invoke(initial_state)
+        final_state = graph.invoke(initial_state, config={"configurable": {"thread_id": conversation_id}})
 
         # Use the agent that actually did the work (or checking persistent state)
         # Verify if graph produced an assistant message
@@ -227,14 +230,49 @@ class SendMessageUseCase:
         last_state: ConversationState | None = None
         started = datetime.now(UTC)
 
-        for state in graph.stream(initial_state, stream_mode="values"):
+        processed_thoughts_count = 0 
+        
+        for state in graph.stream(initial_state, config={"configurable": {"thread_id": conversation_id}}, stream_mode="values"):
             last_state = state
             agent_id = state.get("selected_agent")
             if agent_id and agent_id != selected_agent:
                 selected_agent = agent_id
+                if self.workflow_log_repo:
+                    agent_obj = bundle.agents.get(selected_agent)
+                    self.workflow_log_repo.save(WorkflowLog(
+                        id=str(uuid4()),
+                        conversation_id=conversation_id,
+                        agent_id=selected_agent,
+                        agent_name=agent_obj.name if agent_obj else selected_agent,
+                        event_type="handoff",
+                        created_at=datetime.now(UTC)
+                    ))
                 yield SendMessageStreamEvent(
                     type="agent_selected", agent_id=selected_agent
                 )
+            
+            # Check for new thoughts
+            thoughts = state.get("thoughts", [])
+            if len(thoughts) > processed_thoughts_count:
+                new_thoughts = thoughts[processed_thoughts_count:]
+                for t in new_thoughts:
+                    if self.workflow_log_repo:
+                        self.workflow_log_repo.save(WorkflowLog(
+                            id=str(uuid4()),
+                            conversation_id=conversation_id,
+                            agent_id="router",
+                            agent_name="Router",
+                            event_type="thought",
+                            content=t.get("thought", ""),
+                            metadata=t,
+                            created_at=datetime.now(UTC)
+                        ))
+                    yield SendMessageStreamEvent(
+                        type="thought",
+                        text=t.get("thought", ""),
+                        agent_id="router"
+                    )
+                processed_thoughts_count = len(thoughts)
 
         final_state = last_state or initial_state
         

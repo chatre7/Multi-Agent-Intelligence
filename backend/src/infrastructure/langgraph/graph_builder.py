@@ -16,6 +16,7 @@ from typing import Any, Literal, TypedDict
 import os
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.checkpoint.memory import MemorySaver
 
 from src.domain.entities.agent import Agent
 from src.domain.entities.domain_config import DomainConfig
@@ -38,6 +39,7 @@ class ConversationState(TypedDict, total=False):
     messages: list[ChatMessage]
     selected_agent: str
     pending_tool_calls: list[dict[str, Any]]
+    thoughts: list[dict[str, Any]] # New field for reasoning logs
 
 
 def _extract_keywords(text: str) -> list[str]:
@@ -98,7 +100,10 @@ class ConversationGraphBuilder:
 
         # ========== WORKFLOW STRATEGY DETECTION ==========
         # Check if domain uses new workflow strategies (orchestrator, few_shot, hybrid)
-        workflow_type = domain.metadata.get("workflow_type", "supervisor")
+        # Prioritize domain attribute, fallback to metadata for backward compat
+        workflow_type = domain.workflow_type
+        if workflow_type == "supervisor" and "workflow_type" in domain.metadata:
+             workflow_type = domain.metadata["workflow_type"]
         
         if workflow_type in ["orchestrator", "few_shot", "hybrid"]:
             # Use new workflow strategy system
@@ -131,19 +136,40 @@ class ConversationGraphBuilder:
                         user_request=last_user_message
                     )
                     
-                    # Convert WorkflowResult to conversation messages
+                    # Convert WorkflowResult to conversation messages and thoughts
                     new_messages = list(messages)
+                    new_thoughts = state.get("thoughts", [])
+
                     for step in result.steps:
-                        new_messages.append({
-                            "role": "assistant",
-                            "content": step.metadata.get("result", ""),
-                            "agent_id": step.agent_id,
-                        })
+                        if step.agent_id == "router":
+                            # It's a thought/decision
+                            new_thoughts.append({
+                                "agent_id": "router",
+                                "thought": step.metadata.get("thought", ""),
+                                "decision": step.metadata.get("decision", {}),
+                                "timestamp": None # Could add timestamp
+                            })
+                        else:
+                            # It's a message
+                            new_messages.append({
+                                "role": "assistant",
+                                "content": step.metadata.get("result", ""),
+                                "agent_id": step.agent_id,
+                            })
                     
+                    # Determine last real agent
+                    last_real_agent = domain.default_agent
+                    if result.steps:
+                        # Find last non-router agent
+                        real_steps = [s for s in result.steps if s.agent_id != "router"]
+                        if real_steps:
+                            last_real_agent = real_steps[-1].agent_id
+
                     return {
                         **state,
                         "messages": new_messages,
-                        "selected_agent": result.steps[-1].agent_id if result.steps else domain.default_agent,
+                        "thoughts": new_thoughts,
+                        "selected_agent": last_real_agent,
                     }
                 except Exception as e:
                     print(f"[ERROR] Strategy execution failed: {e}")
@@ -154,7 +180,9 @@ class ConversationGraphBuilder:
             graph.add_edge(START, "strategy_executor")
             graph.add_edge("strategy_executor", END)
             
-            return graph.compile()
+            # Add Checkpointer for persistence
+            checkpointer = MemorySaver()
+            return graph.compile(checkpointer=checkpointer)
         
         # ========== LEGACY SUPERVISOR WORKFLOW ==========
         # Continue with existing supervisor-based workflow for backward compatibility
@@ -361,7 +389,7 @@ class ConversationGraphBuilder:
                     state["selected_agent"] = None
                     
                     try:
-                        model = os.getenv("LLM_MODEL", "qwen3:4b")
+                        model = os.getenv("LLM_MODEL", "gpt-oss:120b-cloud")
                         print(f"[DEBUG] Extracting facts using model: {model}")
                         new_facts = extract_facts(llm, model, messages)
                         if new_facts:
@@ -454,4 +482,5 @@ class ConversationGraphBuilder:
             
         graph.add_conditional_edges("tool_executor", tool_router, route_map)
 
-        return graph.compile()
+        checkpointer = MemorySaver()
+        return graph.compile(checkpointer=checkpointer)

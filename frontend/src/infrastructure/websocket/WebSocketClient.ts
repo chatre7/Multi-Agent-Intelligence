@@ -25,6 +25,7 @@ export type MessageType =
   | "workflow_step_start"
   | "workflow_step_complete"
   | "workflow_handoff"
+  | "workflow_thought"
   | "conversation_started";
 
 export interface WebSocketMessage {

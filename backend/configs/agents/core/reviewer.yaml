@@ -18,7 +18,7 @@ capabilities:
   - performance_optimization
 tools:
   - file_read
-model_name: "qwen3:4b"
+model_name: "gpt-oss:120b-cloud"
 temperature: 0.2
 max_tokens: 2048
 timeout_seconds: 90

@@ -20,6 +20,7 @@ export interface DomainConfig {
   workflow_type: string;
   agents: Agent[];
   active: boolean;
+  metadata?: Record<string, any>;
 }
 
 export interface Message {

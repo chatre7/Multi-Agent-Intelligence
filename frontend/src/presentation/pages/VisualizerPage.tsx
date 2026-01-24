@@ -118,15 +118,6 @@ export function VisualizerPage() {
                             { id: payload.agent_id, name: payload.agent_name, status: 'active' as AgentStatus },
                         ];
                     });
-
-                    // Add event
-                    setEventLog(prev => [{
-                        type: 'step_start',
-                        timestamp: new Date().toISOString(),
-                        agentId: payload.agent_id,
-                        agentName: payload.agent_name,
-                        conversationId: payload.conversationId,
-                    }, ...prev.slice(0, 49)]); // Keep last 50
                 },
             },
             {
@@ -141,15 +132,6 @@ export function VisualizerPage() {
                         ...a,
                         status: a.id === payload.agentId ? 'active' : a.status,
                     })));
-
-                    setEventLog(prev => [{
-                        type: 'step_start',
-                        timestamp: new Date().toISOString(),
-                        agentId: payload.agentId,
-                        agentName: payload.agentName,
-                        conversationId: payload.conversationId,
-                        metadata: {}
-                    }, ...prev.slice(0, 49)]);
                 },
             },
             {
@@ -169,16 +151,6 @@ export function VisualizerPage() {
                             }
                             : a
                     ));
-
-                    const agent = agents.find(a => a.id === payload.agentId);
-                    setEventLog(prev => [{
-                        type: 'step_complete',
-                        timestamp: new Date().toISOString(),
-                        agentId: payload.agentId,
-                        agentName: agent?.name || payload.agentId,
-                        conversationId: payload.conversationId,
-                        metadata: { durationMs: payload.durationMs, tokenCount: payload.tokenCount },
-                    }, ...prev.slice(0, 49)]);
                 },
             },
             {
@@ -200,15 +172,15 @@ export function VisualizerPage() {
                             label: payload.reason,
                         }];
                     });
-
-                    setEventLog(prev => [{
-                        type: 'handoff',
-                        timestamp: new Date().toISOString(),
-                        agentId: payload.toAgentId,
-                        agentName: payload.toAgent,
-                        conversationId: payload.conversationId,
-                        metadata: { fromAgent: payload.fromAgent, reason: payload.reason },
-                    }, ...prev.slice(0, 49)]);
+                },
+            },
+            {
+                type: 'workflow_thought',
+                handler: (data: unknown) => {
+                    console.log("[Visualizer] Received thought event:", data);
+                    const msg = data as { payload: { agentId: string; agentName: string; conversationId: string; reason: string } };
+                    const payload = msg.payload;
+                    if (!payload || selectedConversation?.id !== payload.conversationId) return;
                 },
             },
             {
@@ -346,12 +318,13 @@ export function VisualizerPage() {
                 // Update state
                 setAgents(Array.from(foundAgents.values()));
                 setEdges(foundEdges);
-                setEventLog(historicalEvents.reverse());
+
+                // Fetch workflow logs from API instead of reconstructing from messages
+                fetchWorkflowLogs(convo.id);
 
                 // Set active agent if conversation has one
                 if (convo.activeAgent) {
                     setActiveAgentId(convo.activeAgent);
-
                     // Ensure active agent is in the list
                     if (!foundAgents.has(convo.activeAgent)) {
                         setAgents(prev => {
@@ -360,7 +333,6 @@ export function VisualizerPage() {
                                 name: convo.activeAgent!,
                                 status: 'active' as AgentStatus
                             }];
-                            // If this is the only agent, it's fine. If we had others, maybe link last to active?
                             if (lastAgentId && lastAgentId !== convo.activeAgent) {
                                 setEdges(e => [...e, {
                                     id: `${lastAgentId}-${convo.activeAgent}`,
@@ -376,14 +348,54 @@ export function VisualizerPage() {
                             a.id === convo.activeAgent ? { ...a, status: 'active' } : a
                         ));
                     }
-                } else if (foundAgents.size === 0) {
-                    console.log("[Visualizer] No agents found in history");
                 }
             } else {
                 console.error("[Visualizer] Failed to load messages:", response.status);
             }
         } catch (error) {
             console.error("Failed to load conversation history:", error);
+        }
+    }, [token]);
+
+    const fetchWorkflowLogs = useCallback(async (conversationId: string) => {
+        try {
+            const response = await fetch(`/api/v1/conversations/${conversationId}/workflow-logs`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                const logs: any[] = await response.json();
+                const mapped: WorkflowEvent[] = logs.map(l => ({
+                    id: l.id,
+                    type: l.type as any,
+                    timestamp: l.timestamp,
+                    agentId: l.agentId,
+                    agentName: l.agentName,
+                    conversationId: conversationId,
+                    content: l.content,
+                    metadata: l.metadata || {}
+                }));
+                // Sort by timestamp descending
+                setEventLog(mapped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+            }
+        } catch (error) {
+            console.error("[Visualizer] Failed to fetch workflow logs:", error);
+        }
+    }, [token]);
+
+    const handleDeleteWorkflowLog = useCallback(async (logId: string) => {
+        if (!window.confirm('Are you sure you want to delete this log?')) return;
+        try {
+            const response = await fetch(`/api/v1/workflow-logs/${logId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                setEventLog(prev => prev.filter(l => l.id !== logId));
+            } else {
+                console.error("[Visualizer] Failed to delete log:", response.status);
+            }
+        } catch (error) {
+            console.error("[Visualizer] Error deleting log:", error);
         }
     }, [token]);
 
@@ -516,13 +528,25 @@ export function VisualizerPage() {
                             <div className="text-gray-500 dark:text-gray-400">Loading visualizer…</div>
                         </div>
                     }>
-                        <WorkflowVisualizer
-                            agents={agents}
-                            edges={edges}
-                            activeAgentId={activeAgentId}
-                            eventLog={eventLog}
-                            isDarkMode={isDarkMode}
-                        />
+                        <div className="h-[calc(100%-80px)]">
+                            <WorkflowVisualizer
+                                agents={agents}
+                                edges={edges}
+                                activeAgentId={activeAgentId}
+                                eventLog={eventLog}
+                                isDarkMode={isDarkMode}
+                                onDeleteLog={handleDeleteWorkflowLog}
+                            />
+                        </div>
+                        <div className="mt-4 flex justify-end">
+                            <button
+                                onClick={() => selectedConversation && fetchWorkflowLogs(selectedConversation.id)}
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                            >
+                                <RefreshCw className="w-3 h-3" />
+                                Refresh Logs
+                            </button>
+                        </div>
                     </Suspense>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center">

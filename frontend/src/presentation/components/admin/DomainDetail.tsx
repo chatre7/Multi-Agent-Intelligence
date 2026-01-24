@@ -6,6 +6,7 @@ import { X, Copy } from "lucide-react";
 import type { DomainConfig, Agent } from "../../../domain/entities/types";
 import { useEffect, useState } from "react";
 import { apiClient } from "../../../infrastructure/api/apiClient";
+import { DomainConfiguration } from "./DomainConfiguration";
 
 interface DomainDetailProps {
   domain: DomainConfig;
@@ -129,11 +130,10 @@ export function DomainDetail({ domain, onClose }: DomainDetailProps) {
                           </span>
                           {agent.state && (
                             <span
-                              className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${
-                                agent.state === "PRODUCTION"
+                              className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${agent.state === "PRODUCTION"
                                   ? "bg-green-100 text-green-800"
                                   : "bg-yellow-100 text-yellow-800"
-                              }`}
+                                }`}
                             >
                               {agent.state}
                             </span>
@@ -145,6 +145,10 @@ export function DomainDetail({ domain, onClose }: DomainDetailProps) {
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="border-t border-gray-200 pt-6">
+            <DomainConfiguration domain={domain} />
           </div>
 
           {/* Metadata */}

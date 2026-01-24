@@ -546,6 +546,17 @@ def register_websocket_routes(
                                             "timestamp": asyncio.get_event_loop().time(),
                                         },
                                     })
+                                if event.type == "thought":
+                                    await ws_send({
+                                        "type": "workflow_thought",
+                                        "conversationId": conversation_id,
+                                        "payload": {
+                                            "agentId": event.agent_id or "router",
+                                            "agentName": "Router",
+                                            "conversationId": conversation_id,
+                                            "reason": event.text or "Thinking..."
+                                        }
+                                    })
                                 if event.type == "delta":
                                     chunk = event.text or ""
                                     chunks.append(chunk)

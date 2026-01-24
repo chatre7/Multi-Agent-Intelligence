@@ -27,7 +27,7 @@ capabilities:
   - orchestration
 tools:
   - transfer_to_agent
-model_name: "qwen3:4b"
+model_name: "gpt-oss:120b-cloud"
 temperature: 0.1
 max_tokens: 1024
 keywords: ["plan", "how to", "complex", "project", "implement feature"]

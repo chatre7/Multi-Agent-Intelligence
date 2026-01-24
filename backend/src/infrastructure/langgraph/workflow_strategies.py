@@ -135,8 +135,10 @@ class OrchestratorStrategy(WorkflowStrategy):
                     f"Available agents: {', '.join(agents.keys())}"
                 )
 
-            # Execute agent with accumulated context
-            result = self._execute_agent(agent, current_context)
+            # Execute agent with retry and validation
+            # Pass full validation context logic here if needed
+            print(f"[INFO] Orchestrator: Executing agent '{agent_id}'")
+            result = self._execute_agent_with_retry(agent, current_context)
 
             # Record this step
             steps.append(
@@ -148,7 +150,7 @@ class OrchestratorStrategy(WorkflowStrategy):
             )
 
             # Build context for next agent
-            current_context = f"{current_context}\n\nPrevious output:\n{result}"
+            current_context = f"{current_context}\n\nPrevious output from {agent_id}:\n{result}"
 
         # Return final result
         return WorkflowResult(
@@ -156,6 +158,69 @@ class OrchestratorStrategy(WorkflowStrategy):
             final_response=steps[-1].metadata["result"] if steps else "",
             metadata={"strategy": "orchestrator"},
         )
+
+    def _execute_agent_with_retry(
+        self, agent: Agent, task: str, max_retries: int = 3
+    ) -> str:
+        """
+        Execute agent with validation and retry logic.
+        
+        Args:
+            agent: Agent to execute.
+            task: Task context.
+            max_retries: Maximum number of retries.
+            
+        Returns:
+            Valid response string.
+        """
+        attempts = 0
+        last_error = None
+        
+        # Temporary feedback history
+        feedback_history = ""
+        
+        while attempts < max_retries:
+            current_task = task
+            if feedback_history:
+                current_task += f"\n\n[SYSTEM FEEDBACK]: Previous attempt invalid. Fix based on: {feedback_history}"
+            
+            response = self._execute_agent(agent, current_task)
+            
+            # Simple validation (can be extended to Pydantic/JSON schema later)
+            is_valid, error_msg = self._validate_output(response)
+            
+            if is_valid:
+                return response
+                
+            print(f"[WARN] Agent {agent.id} output validation failed: {error_msg}. Retrying ({attempts+1}/{max_retries})...")
+            feedback_history = error_msg
+            attempts += 1
+        
+        # Fallback if allowed, or raise
+        print(f"[ERROR] Agent {agent.id} failed all validation attempts.")
+        return f"[FATAL] Could not produce valid output after {max_retries} attempts. Last error: {feedback_history}"
+
+    def _validate_output(self, response: str) -> tuple[bool, str]:
+        """
+        Validate agent output.
+        
+        Currently checks for:
+        1. Empty content
+        2. Error prefixes
+        
+        Future: Integrate Pydantic schema validation here.
+        """
+        if not response or not response.strip():
+            return False, "Output is empty"
+            
+        # Check for common refusal/error patterns
+        if response.strip().startswith("[ERROR]"):
+            return False, "Output indicates internal error"
+            
+        # TODO: Add specific Schema Validation logic here
+        # e.g., if agent.id == 'coder': validate_code_block(response)
+        
+        return True, ""
 
     def _execute_agent(self, agent: Agent, task: str) -> str:
         """
@@ -245,6 +310,7 @@ class FewShotStrategy(WorkflowStrategy):
             ValueError: If default_agent is not found
             KeyError: If required configuration is missing
         """
+        # Execute agent with accumulated context
         steps: List[WorkflowStep] = []
         current_agent_id = domain.default_agent
         current_context = user_request
@@ -263,44 +329,53 @@ class FewShotStrategy(WorkflowStrategy):
         for iteration in range(max_handoffs):
             agent = agents.get(current_agent_id)
             if not agent:
-                # Agent not found, stop gracefully
                 break
 
-            # Add few-shot examples to system prompt
-            enhanced_prompt = self._add_few_shot_examples(
-                agent.system_prompt, domain, agents
-            )
+            # 1. EXECUTE CURRENT AGENT
+            # Note: We don't force handoff examples into the *worker* agent anymore.
+            # Let the worker just do the work.
+            result_response = self._execute_agent(agent, current_context)
 
-            # Execute agent with enhanced prompt
-            result = self._execute_agent_with_examples(
-                agent, current_context, enhanced_prompt
-            )
-
-            # Record this step
             steps.append(
                 WorkflowStep(
                     agent_id=current_agent_id,
                     task=current_context,
                     metadata={
-                        "result": result.response,
-                        "handoff_to": result.handoff_to,
+                        "result": result_response,
                         "iteration": iteration,
                     },
                 )
             )
 
-            # Check if agent decided to handoff
-            if result.handoff_to:
-                # Validate target agent exists
-                if result.handoff_to not in agents:
-                    # Unknown agent, stop here
-                    break
+            # 2. ROUTER DECISION (Dediciated Step)
+            # Ask a "Router" (can be LLM) what to do next based on the result
+            decision = self._decide_next_step(
+                domain, agents, current_context, result_response, steps
+            )
 
-                current_agent_id = result.handoff_to
-                current_context = f"{current_context}\n\n{result.response}"
-            else:
-                # Agent finished, no more handoffs
-                break
+            # Record router thought
+            steps.append(
+                WorkflowStep(
+                    agent_id="router",
+                    task="Route Decision",
+                    metadata={
+                        "result": "", # No visible content
+                        "decision": decision,
+                        "thought": decision.get("reason", "Deciding next step")
+                    },
+                )
+            )
+
+            if decision.get("action") == "handoff":
+                target = decision.get("target_agent")
+                if target and target in agents:
+                    current_agent_id = target
+                    current_context = f"{current_context}\n\n[Previous Agent {agent.id}]: {result_response}"
+                    print(f"[INFO] Handoff to {target} (Reason: {decision.get('reason')})")
+                    continue
+            
+            # If action is 'finish' or invalid, stop
+            break
 
         return WorkflowResult(
             steps=steps,
@@ -311,103 +386,126 @@ class FewShotStrategy(WorkflowStrategy):
             },
         )
 
-    def _add_few_shot_examples(
-        self, base_prompt: str, domain: DomainConfig, agents: dict[str, Agent]
-    ) -> str:
+    def _decide_next_step(
+        self,
+        domain: DomainConfig,
+        agents: dict[str, Agent],
+        original_request: str,
+        last_response: str,
+        history: List[WorkflowStep]
+    ) -> dict[str, Any]:
         """
-        Add few-shot handoff examples to the system prompt.
-
-        Args:
-            base_prompt: Original agent system prompt
-            domain: Domain configuration
-            agents: Available agents
-
-        Returns:
-            Enhanced prompt with handoff examples
+        Act as a Router Decision Maker.
         """
+        # Prepare dynamic examples
+        examples = self._get_routing_examples(domain)
         agent_list = ", ".join(agents.keys())
-        examples = f"""
+        
+        system_prompt = f"""You are a Workflow Router.
+Your goal is to decide if the task is complete or if it needs to be passed to another specialist agent.
 
-# HANDOFF EXAMPLES
+Available Agents: {agent_list}
 
-Available agents: {agent_list}
+ROUTING RULES:
+1. If the last response fully answers the user's request, output action: "finish".
+2. If another agent can add value or is specifically requested, output action: "handoff".
+3. Do not handoff to the same agent immediately.
 
-Example 1:
-User: "I feel sad today"
-Empath: "I'm sorry to hear that. Would you like me to get the Comedian to cheer you up?"
-{{"tool": "transfer_to_agent", "params": {{"target_agent": "comedian", "reason": "User needs cheering up"}}}}
+{examples}
 
-Example 2:
-User: "Tell me about the meaning of life"
-Empath: "That's a deep philosophical question. Let me hand you to our Philosopher."
-{{"tool": "transfer_to_agent", "params": {{"target_agent": "philosopher", "reason": "Philosophical discussion"}}}}
-
-Example 3 (Thai):
-User: "เครียดจัง เล่าเรื่องตลกให้ฟังหน่อย"
-Empath: "โธ่ อย่าเพิ่งเครียดนะครับ เดี๋ยวผมให้ Comedian มาช่วยทำให้ยิ้มดีกว่า"
-{{"tool": "transfer_to_agent", "params": {{"target_agent": "comedian", "reason": "User requested a joke (Thai translation)"}}}}
-
-Example 4 (Thai):
-User: "อยากฟังนิทานก่อนนอน"
-Empath: "ได้เลยครับ นักเล่าเรื่องของเราเก่งมาก เดี๋ยวผมส่งต่อให้นะครับ"
-{{"tool": "transfer_to_agent", "params": {{"target_agent": "storyteller", "reason": "User requested a story (Thai translation)"}}}}
-
-Now handle the user's request using these patterns.
+RESPONSE FORMAT (JSON ONLY):
+{{
+    "action": "finish" | "handoff",
+    "target_agent": "agent_id_if_handoff",
+    "reason": "short explanation"
+}}
 """
-        return base_prompt + examples
-
-    def _execute_agent_with_examples(
-        self, agent: Agent, task: str, prompt: str
-    ) -> _AgentResult:
-        """
-        Execute agent with few-shot enhanced prompt using real LLM.
-
-        Args:
-            agent: Agent to execute
-            task: Task/context for the agent
-            prompt: Enhanced system prompt with examples
-
-        Returns:
-            _AgentResult with response and optional handoff_to
-        """
+        
+        user_context = f"""
+Original Request: {original_request}
+Last Agent Response: {last_response[:500]}...
+Current Handoff Count: {len(history)}
+"""
+        
         try:
             llm = llm_from_env()
-            if llm is None:
-                raise ImportError("LLM service not available")
+            if not llm:
+                return {"action": "finish", "reason": "LLM not available"}
 
-            messages = [{"role": "user", "content": task}]
+            # Use a capable model for routing if possible, or fallback to main model
+            router_model = os.getenv("ROUTER_MODEL", os.getenv("LLM_MODEL", "llama3")) 
+            
+            # Stricter prompt for smaller models
+            system_prompt += "\nIMPORTANT: Return ONLY raw JSON. No conversational text before or after."
 
-            # Use agent's model or default fallback
-            model = agent.model_name
-            if not model or model == "default":
-                model = os.getenv("LLM_MODEL", "llama3")
-
-            full_response = ""
+            response_text = ""
             for chunk in llm.stream_chat(
-                model=model,
-                system_prompt=prompt,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=2000,
+                model=router_model,
+                system_prompt=system_prompt,
+                messages=[{"role": "user", "content": user_context}],
+                temperature=0.1, # Low temp for deterministic routing
+                max_tokens=300
             ):
-                full_response += chunk
-
-            # Basic parsing for handoff (MVP)
-            # Look for JSON-like pattern: "target_agent": "agent_name"
-            handoff_to = None
-            if "transfer_to_agent" in full_response:
-                match = re.search(r'target_agent":\s*"([^"]+)"', full_response)
-                if match:
-                    handoff_to = match.group(1)
-
-            return _AgentResult(response=full_response, handoff_to=handoff_to)
-
+                response_text += chunk
+            
+            # Parse JSON with robust extraction
+            import json
+            import re
+            
+            # Find first { and last }
+            match = re.search(r'(\{.*\})', response_text, re.DOTALL)
+            if not match:
+                 return {"action": "finish", "reason": f"No JSON block in: {response_text[:50]}..."}
+            
+            clean_json = match.group(1).strip()
+            return json.loads(clean_json)
+            
         except Exception as e:
-            print(f"[ERROR] LLM Execution failed: {e}")
-            return _AgentResult(
-                response=f"[{agent.id}] (Error): {str(e)}. Original task: {task[:50]}...",
-                handoff_to=None,
-            )
+            print(f"[WARN] Router decision failed: {e}. Output was: {response_text}")
+            return {"action": "finish", "reason": f"Routing error: {str(e)}"}
+
+    def _get_routing_examples(self, domain: DomainConfig) -> str:
+        """Get routing examples from domain metadata or defaults."""
+        few_shot_config = domain.metadata.get("few_shot", {})
+        custom_examples = few_shot_config.get("routing_examples", [])
+        
+        if custom_examples:
+            formatted = "\nEXAMPLES:\n"
+            for ex in custom_examples:
+                formatted += f"Situation: {ex['situation']}\nDecision: {json.dumps(ex['decision'])}\n\n"
+            return formatted
+            
+        # Default Examples
+        return """
+EXAMPLES:
+
+Situation: User asked for a joke, Empath replied "Here is a joke...".
+Decision: {"action": "finish", "reason": "Request fulfilled"}
+
+Situation: User asked for code review, Planner outlined the plan.
+Decision: {"action": "handoff", "target_agent": "coder", "reason": "Move to implementation phase"}
+"""
+
+    def _execute_agent(self, agent: Agent, task: str) -> str:
+        """Re-use base execution logic (same as Orchestrator base implementation)."""
+        # This duplicates _execute_agent from Orchestrator slightly to avoid mixin complexity for now,
+        # or we could make a Mixin. For safety, a simple direct call integration:
+        try:
+            llm = llm_from_env()
+            if llm is None: raise ImportError("No LLM")
+            
+            full_resp = ""
+            for chunk in llm.stream_chat(
+                model=agent.model_name or "default",
+                system_prompt=agent.system_prompt,
+                messages=[{"role": "user", "content": task}],
+                temperature=0.7,
+                max_tokens=2000
+            ):
+                full_resp += chunk
+            return full_resp
+        except Exception as e:
+            return f"Error: {e}"
 
 
 class HybridStrategy(WorkflowStrategy):
@@ -487,9 +585,11 @@ class HybridStrategy(WorkflowStrategy):
                 )
                 steps.extend(planning_result.steps)
 
-                # Update context with planning results
+                # Update context with planning results (Summarized)
                 if planning_result.final_response:
-                    current_context = planning_result.final_response
+                    raw_context = planning_result.final_response
+                    current_context = self._summarize_context(raw_context, "Planning")
+                    print(f"[INFO] Hybrid: Planning Phase summarized. Length: {len(raw_context)} -> {len(current_context)}")
 
         # Phase 2: LLM-based agent selection (if configured)
         if "agent_selection" in llm_phases:
@@ -527,9 +627,11 @@ class HybridStrategy(WorkflowStrategy):
                 )
                 steps.extend(execution_result.steps)
 
-                # Update context
+                # Update context (Summarized)
                 if execution_result.final_response:
-                    current_context = execution_result.final_response
+                    raw_context = execution_result.final_response
+                    current_context = self._summarize_context(raw_context, "Execution")
+                    print(f"[INFO] Hybrid: Execution Phase summarized. Length: {len(raw_context)} -> {len(current_context)}")
 
         # Phase 3: Orchestrated validation (if configured)
         if "validation" in orchestrated_phases:
@@ -578,10 +680,62 @@ class HybridStrategy(WorkflowStrategy):
             },
         )
 
+    def _summarize_context(self, current_context: str, phase_name: str) -> str:
+        """
+        Compress context using LLM before handing off to next phase.
+        
+        Args:
+            current_context: Full text context to summarize.
+            phase_name: Name of the completed phase (e.g., "Planning").
+            
+        Returns:
+            Summarized context string.
+        """
+        # If context is short, no need to summarize
+        if len(current_context) < 1000:
+            return current_context
+            
+        try:
+            llm = llm_from_env()
+            if not llm:
+                return current_context
+
+            summary_prompt = f"""
+You are a Technical Summarizer.
+Summarize the key information from the '{phase_name}' phase.
+Capture all decisions, plan steps, and constraints.
+Discard conversational fluff.
+
+CONTENT TO SUMMARIZE:
+{current_context[:10000]} # Limit input length just in case
+
+SUMMARY:
+"""
+            model = os.getenv("LLM_MODEL", "llama3")
+            summary = ""
+            for chunk in llm.stream_chat(
+                model=model,
+                system_prompt=summary_prompt,
+                messages=[],
+                temperature=0.0,
+                max_tokens=500
+            ):
+                summary += chunk
+                
+            return f"--- {phase_name} Phase Summary ---\n{summary.strip()}\n--------------------------------"
+            
+        except Exception as e:
+            print(f"[WARN] Context summarization failed: {e}")
+            return current_context
+
 
 def get_workflow_strategy(domain: DomainConfig) -> WorkflowStrategy:
     """Factory function to get appropriate strategy for domain."""
-    workflow_type = domain.metadata.get("workflow_type", "few_shot")
+    workflow_type = domain.workflow_type
+    
+    # Fallback to metadata
+    if workflow_type == "supervisor" and "workflow_type" in domain.metadata:
+        workflow_type = domain.metadata["workflow_type"]
 
     strategies = {
         "orchestrator": OrchestratorStrategy,

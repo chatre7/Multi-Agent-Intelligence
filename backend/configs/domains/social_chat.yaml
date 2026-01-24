@@ -7,7 +7,7 @@ agents:
   - philosopher
   - empath
 default_agent: empath
-workflow_type: supervisor
+workflow_type: few_shot
 max_iterations: 5
 routing_rules:
   # Storyteller - narrative and creative stories

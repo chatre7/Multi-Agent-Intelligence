@@ -134,7 +134,15 @@ export default function ChatMessage({ message }: ChatMessageProps) {
               : `bg-gradient-to-br ${metadata.bubbleBg} border ${metadata.bubbleBorder} ${metadata.bubbleText}`
               }`}>
               <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                {message.content}
+                {(!message.content && !isUser) ? (
+                  <div className="flex gap-1 items-center h-5 px-1">
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                  </div>
+                ) : (
+                  message.content
+                )}
               </p>
 
               <time className={`text-[10px] mt-2 block ${isUser ? "text-right text-blue-100" : "text-left text-gray-500"}`}>

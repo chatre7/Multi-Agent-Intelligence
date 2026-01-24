@@ -95,7 +95,7 @@ class OpenAIStreamingLLM(StreamingLLM):
                      print(f"[DEBUG] OpenAI Stream Event Error: {e}")
         except Exception as e:
             print(f"[DEBUG] OpenAI Client Error: {e}")
-            yield ""
+            yield f"\n\n[SYSTEM ERROR] LLM Stream Failed: {str(e)}"
 
 
 def llm_from_env() -> StreamingLLM:

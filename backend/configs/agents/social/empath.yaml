@@ -22,7 +22,7 @@ capabilities:
   - empathy
 tools:
   - transfer_to_agent
-model_name: "qwen3:4b"
+model_name: "gpt-oss:120b-cloud"
 temperature: 0.6
 max_tokens: 768
 keywords: ["feel", "emotion", "support"]

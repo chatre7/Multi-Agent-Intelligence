@@ -21,7 +21,7 @@ capabilities:
   - narrative_design
 tools:
   - transfer_to_agent
-model_name: "qwen3:4b"
+model_name: "gpt-oss:120b-cloud"
 temperature: 0.9
 max_tokens: 1024
 keywords: ["story", "tale", "narrative"]

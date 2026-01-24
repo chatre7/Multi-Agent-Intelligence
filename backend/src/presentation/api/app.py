@@ -60,12 +60,18 @@ from src.infrastructure.llm.streaming import llm_from_env
 from src.infrastructure.persistence.in_memory.conversations import (
     InMemoryConversationRepository,
 )
+from src.infrastructure.persistence.in_memory.workflow_logs import (
+    InMemoryWorkflowLogRepository,
+)
 from src.infrastructure.persistence.in_memory.registered_agents import (
     InMemoryRegisteredAgentRepository,
 )
 from src.infrastructure.persistence.in_memory.tool_runs import InMemoryToolRunRepository
 from src.infrastructure.persistence.sqlite.conversations import (
     SqliteConversationRepository,
+)
+from src.infrastructure.persistence.sqlite.workflow_logs import (
+    SqliteWorkflowLogRepository,
 )
 from src.infrastructure.persistence.sqlite.registered_agents import (
     SqliteRegisteredAgentRepository,
@@ -138,13 +144,17 @@ def create_app() -> FastAPI:
     if conversation_repo_name == "sqlite":
         conversation_db = os.getenv("CONVERSATION_DB", "conversations.db")
         conversation_repo = SqliteConversationRepository(db_path=conversation_db)
+        workflow_log_repo = SqliteWorkflowLogRepository(db_path=conversation_db)
     else:
         conversation_repo = InMemoryConversationRepository()
+        workflow_log_repo = InMemoryWorkflowLogRepository()
+
     use_case = SendMessageUseCase(
         loader=loader,
         graph_builder=ConversationGraphBuilder(),
         llm=llm_from_env(),
         conversation_repo=conversation_repo,
+        workflow_log_repo=workflow_log_repo,
     )
     tool_run_repo_name = (os.getenv("TOOL_RUN_REPO", "memory") or "memory").lower()
     if tool_run_repo_name == "sqlite":
@@ -766,6 +776,60 @@ def create_app() -> FastAPI:
         if next_cursor:
             response.headers["x-next-cursor"] = next_cursor
         return [c.to_dict() for c in conversations]
+
+    @app.get("/v1/conversations/{conversation_id}/workflow-logs")
+    def list_workflow_logs(
+        conversation_id: str,
+        limit: int = 100,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> list[dict[str, Any]]:
+        sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            require_permission_set(perms, Permission.CHAT_READ)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        convo = conversation_repo.get_conversation(conversation_id)
+        if convo is None:
+            raise HTTPException(status_code=404, detail="Unknown conversation_id")
+        if (
+            role not in {"admin", "developer"}
+            and convo.created_by_sub
+            and convo.created_by_sub != sub
+        ):
+            raise HTTPException(status_code=404, detail="Unknown conversation_id")
+
+        logs = workflow_log_repo.list_by_conversation(conversation_id, limit=limit)
+        return [
+            {
+                "id": l.id,
+                "agentId": l.agent_id,
+                "agentName": l.agent_name,
+                "type": l.event_type,
+                "content": l.content,
+                "metadata": l.metadata,
+                "timestamp": l.created_at.isoformat(),
+            }
+            for l in logs
+        ]
+
+    @app.delete("/v1/workflow-logs/{log_id}")
+    def delete_workflow_log(
+        log_id: str,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _sub, _role, perms = resolve_principal(
+            x_role=x_role, authorization=authorization
+        )
+        try:
+            require_permission_set(perms, Permission.CHAT_SEND)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        workflow_log_repo.delete(log_id)
+        return {"status": "success"}
 
     @app.post("/v1/tool-runs")
     def request_tool_run(

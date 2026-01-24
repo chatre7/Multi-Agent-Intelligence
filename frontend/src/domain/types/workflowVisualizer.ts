@@ -21,11 +21,13 @@ export interface WorkflowEdgeData {
 }
 
 export interface WorkflowEvent {
-    type: 'step_start' | 'step_complete' | 'handoff';
+    id?: string;
+    type: 'step_start' | 'step_complete' | 'handoff' | 'thought';
     timestamp: string;
     agentId: string;
     agentName: string;
     conversationId: string;
+    content?: string;
     metadata?: Record<string, unknown>;
 }
 
