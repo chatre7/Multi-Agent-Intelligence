@@ -27,7 +27,8 @@ from src.infrastructure.tools.registry import ToolRegistry
 from src.infrastructure.persistence.chroma.memory_repository import ChromaMemoryRepository
 from src.infrastructure.langgraph.memory_utils import extract_facts
 from src.infrastructure.config.skill_loader import SkillLoader
-from src.application.use_cases.skills import get_effective_system_prompt
+from src.domain.repositories.skill_repository import ISkillRepository
+from src.application.use_cases.skills import get_effective_system_prompt, get_effective_tools
 from pathlib import Path
 
 
@@ -92,6 +93,9 @@ Wait for the tool output before concluding.
 class ConversationGraphBuilder:
     """Builds a supervisor-style conversation graph from configs."""
 
+    skill_repo: ISkillRepository | None = None
+    skill_loader: SkillLoader | None = None
+
     def build(self, domain: DomainConfig, agents_by_id: dict[str, Agent]):
         missing_agents = [
             agent_id for agent_id in domain.agents if agent_id not in agents_by_id
@@ -121,9 +125,14 @@ class ConversationGraphBuilder:
             
             graph: StateGraph[ConversationState] = StateGraph(ConversationState)
             
-            def strategy_executor(state: ConversationState) -> ConversationState:
+            def strategy_executor(state: ConversationState, config: Any = None) -> ConversationState:
                 """Execute workflow strategy and update conversation state."""
                 messages = state.get("messages", [])
+                
+                # Get token callback from config if present
+                token_callback = None
+                if config and "configurable" in config:
+                    token_callback = config["configurable"].get("token_callback")
                 
                 # Get last user message as the request
                 last_user_message = next(
@@ -136,7 +145,8 @@ class ConversationGraphBuilder:
                     result = strategy.execute(
                         domain=domain,
                         agents=agents_by_id,
-                        user_request=last_user_message
+                        user_request=last_user_message,
+                        token_callback=token_callback
                     )
                     
                     # Convert WorkflowResult to conversation messages and thoughts
@@ -222,8 +232,9 @@ class ConversationGraphBuilder:
             def run_agent(state: ConversationState) -> ConversationState:
                 messages = list(state.get("messages", []))
                 
-                # Get tools for this agent
-                tools = registry.get_tools_for_agent(agent.tools)
+                # Get effective tools (including skill-provided tools)
+                effective_tools_ids = get_effective_tools(agent, list(all_skills.values()))
+                tools = registry.get_tools_for_agent(effective_tools_ids)
                 
                 # 1. Search Memory
                 user_query = ""
@@ -247,15 +258,20 @@ class ConversationGraphBuilder:
 
                 # 2. Format system prompt with Agent instructions + Tool instructions + Memory
                 # Load skills for this agent
-                skill_loader = SkillLoader(Path("backend/configs/skills"))
-                loaded_skills = []
-                for skill_id in agent.skills:
-                    skill = skill_loader.load_skill(skill_id)
-                    if skill:
-                        loaded_skills.append(skill)
+                all_skills = {}
+                if self.skill_loader:
+                    for skill_id in agent.skills:
+                        skill = self.skill_loader.load_skill(skill_id)
+                        if skill:
+                            all_skills[skill.id] = skill
                 
+                if self.skill_repo:
+                    db_skills = self.skill_repo.get_agent_skills(agent.id)
+                    for s in db_skills:
+                        all_skills[s.id] = s
+            
                 # Get effective system prompt (includes skill instructions)
-                base_system_prompt = get_effective_system_prompt(agent, loaded_skills)
+                base_system_prompt = get_effective_system_prompt(agent, list(all_skills.values()))
                 
                 if memories:
                     memory_context = "\n- ".join(memories)

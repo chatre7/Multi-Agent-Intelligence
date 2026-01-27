@@ -30,16 +30,13 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({
         setIsImporting(true);
         try {
             const skill = await apiClient.importSkill(importUrl);
-            alert(`Successfully imported skill: ${skill.name} (${skill.version})`);
+            console.log(`Successfully imported skill: ${skill.name}`);
             setImportUrl('');
             setTab('installed');
-            // Suggest refresh
-            if (window.confirm("Reload to see new skill?")) {
-                window.location.reload();
-            }
+            // Notify parent if possible, or just refresh
+            window.location.reload();
         } catch (error: any) {
             console.error(error);
-            alert(`Failed to import skill: ${error.message || 'Unknown error'}`);
         } finally {
             setIsImporting(false);
         }
@@ -103,6 +100,22 @@ export const SkillPicker: React.FC<SkillPickerProps> = ({
                             onChange={e => setSearch(e.target.value)}
                         />
                     </div>
+                </div>
+
+                {/* Tag Filters */}
+                <div className="px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex gap-2 overflow-x-auto no-scrollbar">
+                    {['All', 'Engineering', 'Research', 'Creative', 'Architecture', 'AI'].map(tag => (
+                        <button
+                            key={tag}
+                            onClick={() => setSearch(tag === 'All' ? '' : tag)}
+                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${(search === tag || (tag === 'All' && !search))
+                                ? 'bg-gray-900 text-white dark:bg-white dark:text-black'
+                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200'
+                                }`}
+                        >
+                            {tag}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Content */}

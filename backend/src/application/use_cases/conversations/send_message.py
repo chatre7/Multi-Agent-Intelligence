@@ -20,8 +20,11 @@ from src.infrastructure.config import ConfigBundle, YamlConfigLoader
 from src.infrastructure.langgraph import ConversationGraphBuilder, ConversationState
 from src.infrastructure.llm import StreamingLLM
 from src.infrastructure.config.skill_loader import SkillLoader
+from src.domain.repositories.skill_repository import ISkillRepository
 from src.application.use_cases.skills import get_effective_system_prompt
 from pathlib import Path
+import queue
+import threading
 
 
 @dataclass(frozen=True)
@@ -65,6 +68,8 @@ class SendMessageUseCase:
     llm: StreamingLLM
     conversation_repo: IConversationRepository | None = None
     workflow_log_repo: IWorkflowLogRepository | None = None
+    skill_repo: ISkillRepository | None = None
+    skill_loader: SkillLoader | None = None
     _bundle_cache: ConfigBundle | None = None
     _bundle_cache_hash: str | None = None
 
@@ -148,14 +153,19 @@ class SendMessageUseCase:
             agent_id = selected_agent
             
             # Load skills and get effective system prompt
-            skill_loader = SkillLoader(Path("backend/configs/skills"))
-            loaded_skills = []
-            for skill_id in agent.skills:
-                skill = skill_loader.load_skill(skill_id)
-                if skill:
-                    loaded_skills.append(skill)
+            all_skills = {}
+            if self.skill_loader:
+                for skill_id in agent.skills:
+                    skill = self.skill_loader.load_skill(skill_id)
+                    if skill:
+                        all_skills[skill.id] = skill
+
+            if self.skill_repo:
+                db_skills = self.skill_repo.get_agent_skills(agent.id)
+                for s in db_skills:
+                    all_skills[s.id] = s
             
-            effective_prompt = get_effective_system_prompt(agent, loaded_skills)
+            effective_prompt = get_effective_system_prompt(agent, list(all_skills.values()))
             
             reply_parts: list[str] = []
             for chunk in self.llm.stream_chat(
@@ -244,8 +254,40 @@ class SendMessageUseCase:
         started = datetime.now(UTC)
 
         processed_thoughts_count = 0 
+        reply_text = ""
         
-        for state in graph.stream(initial_state, config={"configurable": {"thread_id": conversation_id}}, stream_mode="values"):
+        # Side-channel for tokens from inside graph nodes
+        token_queue = queue.Queue()
+        
+        def token_callback(token: str):
+            token_queue.put({"type": "token", "content": token})
+            
+        def run_graph():
+            try:
+                # Pass token_callback in configuration
+                config = {"configurable": {"thread_id": conversation_id, "token_callback": token_callback}}
+                for state in graph.stream(initial_state, config=config, stream_mode="values"):
+                    token_queue.put({"type": "state", "content": state})
+                token_queue.put(None) # Done
+            except Exception as e:
+                token_queue.put(e)
+                
+        threading.Thread(target=run_graph, daemon=True).start()
+        
+        while True:
+            item = token_queue.get()
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+                
+            if item["type"] == "token":
+                chunk = item["content"]
+                reply_text += chunk
+                yield SendMessageStreamEvent(type="delta", text=chunk)
+                continue
+                
+            state = item["content"]
             last_state = state
             agent_id = state.get("selected_agent")
             if agent_id and agent_id != selected_agent:
@@ -293,15 +335,23 @@ class SendMessageUseCase:
         messages = final_state.get("messages", [])
         last_message = messages[-1] if messages else None
         
-        reply_text = ""
         final_agent_id = selected_agent or domain.default_agent # Use tracked agent from loop
 
         if last_message and last_message["role"] == "assistant":
-             # Graph executed the agent.
-             reply_text = last_message["content"]
-             # If we have the full text, we can't really stream it nicely event-by-event 
-             # unless we split it. For MVP, just emit one delta.
-             yield SendMessageStreamEvent(type="delta", text=reply_text)
+             # If we haven't streamed anything yet (e.g. node didn't use callback) 
+             # or if there's more content, yield it.
+             # Actually, if reply_text is empty, we MUST yield the full message.
+             # If not empty, we assume we already streamed most of it.
+             graph_reply = last_message["content"]
+             if not reply_text:
+                 reply_text = graph_reply
+                 yield SendMessageStreamEvent(type="delta", text=reply_text)
+             elif len(graph_reply) > len(reply_text):
+                 # Yield the remaining part if any (rare edge case)
+                 diff = graph_reply[len(reply_text):]
+                 if diff:
+                     yield SendMessageStreamEvent(type="delta", text=diff)
+                     reply_text = graph_reply
              
         else:
             # Fallback for Router-only graph
@@ -316,14 +366,19 @@ class SendMessageUseCase:
             final_agent_id = selected_agent_final
 
             # Load skills and get effective system prompt
-            skill_loader = SkillLoader(Path("backend/configs/skills"))
-            loaded_skills = []
-            for skill_id in agent.skills:
-                skill = skill_loader.load_skill(skill_id)
-                if skill:
-                    loaded_skills.append(skill)
+            all_skills = {}
+            if self.skill_loader:
+                for skill_id in agent.skills:
+                    skill = self.skill_loader.load_skill(skill_id)
+                    if skill:
+                        all_skills[skill.id] = skill
             
-            effective_prompt = get_effective_system_prompt(agent, loaded_skills)
+            if self.skill_repo:
+                db_skills = self.skill_repo.get_agent_skills(agent.id)
+                for s in db_skills:
+                    all_skills[s.id] = s
+            
+            effective_prompt = get_effective_system_prompt(agent, list(all_skills.values()))
 
             reply_parts: list[str] = []
             llm_messages = [{"role": "user", "content": request.message}]

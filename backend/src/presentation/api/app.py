@@ -85,6 +85,8 @@ from src.presentation.metrics import (
     TOOL_RUNS_REQUESTED_TOTAL,
 )
 from src.infrastructure.config.skill_importer import SkillImporter
+from src.infrastructure.config.skill_loader import SkillLoader
+from src.infrastructure.persistence.sqlite.skills import SqliteSkillRepository
 from src.presentation.websocket.handlers import register_websocket_routes
 
 _CONVERSATION_CURSOR_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T.+\|[0-9a-fA-F-]{8,}$")
@@ -142,6 +144,10 @@ class SkillImportRequest(BaseModel):
     branch: str | None = None
 
 
+class SkillSelection(BaseModel):
+    skill_id: str
+
+
 def create_app() -> FastAPI:
     loader = YamlConfigLoader.from_default_backend_root()
     conversation_repo_name = (
@@ -155,12 +161,37 @@ def create_app() -> FastAPI:
         conversation_repo = InMemoryConversationRepository()
         workflow_log_repo = InMemoryWorkflowLogRepository()
 
+    # Skills System Initialization
+    data_dir = loader.config_root.parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    skill_db_path = str(data_dir / "skills.db")
+    
+    skill_repo = SqliteSkillRepository(skill_db_path)
+    
+    # Seeding: Sync skills from disk to DB on startup
+    skills_dir = loader.config_root / "skills"
+    skill_loader_instance = SkillLoader(skills_dir)
+    try:
+        if skills_dir.exists():
+            for skill in skill_loader_instance.load_all_skills():
+                skill_repo.save(skill)
+    except Exception as e:
+        print(f"Warning: Failed to seed skills: {e}")
+
+    # Use Case and Graph Builder setup
+    graph_builder = ConversationGraphBuilder(
+        skill_repo=skill_repo,
+        skill_loader=skill_loader_instance
+    )
+
     use_case = SendMessageUseCase(
         loader=loader,
-        graph_builder=ConversationGraphBuilder(),
+        graph_builder=graph_builder,
         llm=llm_from_env(),
         conversation_repo=conversation_repo,
         workflow_log_repo=workflow_log_repo,
+        skill_repo=skill_repo,
+        skill_loader=skill_loader_instance
     )
     tool_run_repo_name = (os.getenv("TOOL_RUN_REPO", "memory") or "memory").lower()
     if tool_run_repo_name == "sqlite":
@@ -185,6 +216,22 @@ def create_app() -> FastAPI:
     bump_agent_version_uc = BumpAgentVersionUseCase(repo=registered_agent_repo)
     list_registered_agents_uc = ListRegisteredAgentsUseCase(repo=registered_agent_repo)
     get_registered_agent_uc = GetRegisteredAgentUseCase(repo=registered_agent_repo)
+
+    # Skills System Initialization
+    # Assuming loader.config_root is backend/configs
+    # We want backend/data/skills.db
+    data_dir = loader.config_root.parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    skill_db_path = str(data_dir / "skills.db")
+    
+    skill_repo = SqliteSkillRepository(skill_db_path)
+    
+    try:
+        if skills_dir.exists():
+            for skill in skill_loader_instance.load_all_skills():
+                skill_repo.save(skill)
+    except Exception as e:
+        print(f"Warning: Failed to seed skills: {e}")
 
     from fastapi.middleware.cors import CORSMiddleware
 
@@ -649,10 +696,12 @@ def create_app() -> FastAPI:
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
 
+        # Use closure variables: loader, skill_repo
         skills_dir = loader.config_root / "skills"
         importer = SkillImporter(skills_dir)
         try:
             skill = importer.import_from_git(payload.url, payload.branch)
+            skill_repo.save(skill) # Update DB
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -662,6 +711,96 @@ def create_app() -> FastAPI:
             "version": skill.version,
             "description": skill.description,
         }
+
+    @app.get("/v1/skills")
+    def list_skills(
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> list[dict[str, Any]]:
+        _sub, role, perms = resolve_principal(
+            x_role=x_role, authorization=authorization
+        )
+        try:
+            require_permission_set(perms, Permission.AGENT_READ)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        try:
+            # Read from DB instead of File System
+            skills = skill_repo.list_all()
+        except Exception as exc:
+            print(f"[ERROR] Failed to list skills: {exc}")
+            skills = []
+            
+        return [
+            {
+                "id": s.id,
+                "name": s.name,
+                "version": s.version,
+                "description": s.description,
+            }
+            for s in skills
+        ]
+
+    @app.get("/v1/agents/{agent_id}/skills")
+    def list_agent_skills(
+        agent_id: str,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> list[dict[str, Any]]:
+        _sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            require_permission_set(perms, Permission.AGENT_READ)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        skills = skill_repo.get_agent_skills(agent_id)
+        return [
+            {
+                "id": s.id,
+                "name": s.name,
+                "version": s.version,
+                "description": s.description,
+            }
+            for s in skills
+        ]
+
+    @app.post("/v1/agents/{agent_id}/skills")
+    def attach_skill(
+        agent_id: str,
+        payload: SkillSelection,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ):
+        _sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            require_permission_set(perms, Permission.AGENT_WRITE)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        # Check if skill exists
+        skill = skill_repo.get(payload.skill_id)
+        if not skill:
+            raise HTTPException(status_code=404, detail="Skill not found")
+
+        skill_repo.add_skill_to_agent(agent_id, payload.skill_id)
+        return {"status": "success", "agent_id": agent_id, "skill_id": payload.skill_id}
+
+    @app.delete("/v1/agents/{agent_id}/skills/{skill_id}")
+    def detach_skill(
+        agent_id: str,
+        skill_id: str,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ):
+        _sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            require_permission_set(perms, Permission.AGENT_WRITE)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        skill_repo.remove_skill_from_agent(agent_id, skill_id)
+        return {"status": "success"}
 
     @app.post("/v1/chat")
     def chat(

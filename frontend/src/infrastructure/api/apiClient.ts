@@ -9,6 +9,7 @@ import type {
   DomainConfig,
   Agent,
   ToolRun,
+  Skill,
 } from "../../domain/entities/types";
 import { resolveApiBaseUrl } from "../config/urls";
 
@@ -181,6 +182,24 @@ export class ApiClient {
       branch
     });
     return response.data;
+  }
+
+  async listSkills(): Promise<Skill[]> {
+    const response = await this.client.get<Skill[]>("/skills");
+    return response.data;
+  }
+
+  async getAgentSkills(agentId: string): Promise<Skill[]> {
+    const response = await this.client.get<Skill[]>(`/agents/${agentId}/skills`);
+    return response.data;
+  }
+
+  async attachSkill(agentId: string, skillId: string): Promise<void> {
+    await this.client.post(`/agents/${agentId}/skills`, { skill_id: skillId });
+  }
+
+  async detachSkill(agentId: string, skillId: string): Promise<void> {
+    await this.client.delete(`/agents/${agentId}/skills/${skillId}`);
   }
 }
 

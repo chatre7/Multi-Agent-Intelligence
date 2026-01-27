@@ -14,7 +14,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, Callable
 
 from src.domain.entities.agent import Agent
 from src.domain.entities.domain_config import DomainConfig
@@ -69,6 +69,7 @@ class WorkflowStrategy(ABC):
         domain: DomainConfig,
         agents: dict[str, Agent],
         user_request: str,
+        token_callback: Optional[Callable[[str], None]] = None,
     ) -> WorkflowResult:
         """Execute the workflow for a given request."""
 
@@ -98,6 +99,7 @@ class OrchestratorStrategy(WorkflowStrategy):
         domain: DomainConfig,
         agents: dict[str, Agent],
         user_request: str,
+        token_callback: Optional[Callable[[str], None]] = None,
     ) -> WorkflowResult:
         """
         Execute deterministic pipeline from domain config.
@@ -144,7 +146,7 @@ class OrchestratorStrategy(WorkflowStrategy):
             # Execute agent with retry and validation
             # Pass full validation context logic here if needed
             print(f"[INFO] Orchestrator: Executing agent '{agent_id}'")
-            result = self._execute_agent_with_retry(agent, current_context)
+            result = self._execute_agent_with_retry(agent, current_context, token_callback=token_callback)
 
             # Record this step
             steps.append(
@@ -166,7 +168,7 @@ class OrchestratorStrategy(WorkflowStrategy):
         )
 
     def _execute_agent_with_retry(
-        self, agent: Agent, task: str, max_retries: int = 3
+        self, agent: Agent, task: str, max_retries: int = 3, token_callback: Optional[Callable[[str], None]] = None
     ) -> str:
         """
         Execute agent with validation and retry logic.
@@ -190,7 +192,7 @@ class OrchestratorStrategy(WorkflowStrategy):
             if feedback_history:
                 current_task += f"\n\n[SYSTEM FEEDBACK]: Previous attempt invalid. Fix based on: {feedback_history}"
             
-            response = self._execute_agent(agent, current_task)
+            response = self._execute_agent(agent, current_task, token_callback=token_callback)
             
             # Simple validation (can be extended to Pydantic/JSON schema later)
             is_valid, error_msg = self._validate_output(response)
@@ -228,7 +230,7 @@ class OrchestratorStrategy(WorkflowStrategy):
         
         return True, ""
 
-    def _execute_agent(self, agent: Agent, task: str) -> str:
+    def _execute_agent(self, agent: Agent, task: str, token_callback: Optional[Callable[[str], None]] = None) -> str:
         """
         Execute a single agent with the given task using real LLM.
 
@@ -272,6 +274,8 @@ class OrchestratorStrategy(WorkflowStrategy):
                 max_tokens=2000,
             ):
                 full_response += chunk
+                if token_callback:
+                    token_callback(chunk)
 
             return full_response
 
@@ -310,6 +314,7 @@ class FewShotStrategy(WorkflowStrategy):
         domain: DomainConfig,
         agents: dict[str, Agent],
         user_request: str,
+        token_callback: Optional[Callable[[str], None]] = None,
     ) -> WorkflowResult:
         """
         Execute workflow with LLM deciding handoffs using few-shot examples.
@@ -350,7 +355,7 @@ class FewShotStrategy(WorkflowStrategy):
             # 1. EXECUTE CURRENT AGENT
             # Note: We don't force handoff examples into the *worker* agent anymore.
             # Let the worker just do the work.
-            result_response = self._execute_agent(agent, current_context)
+            result_response = self._execute_agent(agent, current_context, token_callback=token_callback)
 
             steps.append(
                 WorkflowStep(
@@ -506,7 +511,7 @@ Situation: User asked for code review, Planner outlined the plan.
 Decision: {"action": "handoff", "target_agent": "coder", "reason": "Move to implementation phase"}
 """
 
-    def _execute_agent(self, agent: Agent, task: str) -> str:
+    def _execute_agent(self, agent: Agent, task: str, token_callback: Optional[Callable[[str], None]] = None) -> str:
         """Re-use base execution logic (same as Orchestrator base implementation)."""
         # This duplicates _execute_agent from Orchestrator slightly to avoid mixin complexity for now,
         # or we could make a Mixin. For safety, a simple direct call integration:
@@ -533,6 +538,8 @@ Decision: {"action": "handoff", "target_agent": "coder", "reason": "Move to impl
                 max_tokens=2000
             ):
                 full_resp += chunk
+                if token_callback:
+                    token_callback(chunk)
             return full_resp
         except Exception as e:
             return f"Error: {e}"
@@ -566,6 +573,7 @@ class HybridStrategy(WorkflowStrategy):
         domain: DomainConfig,
         agents: dict[str, Agent],
         user_request: str,
+        token_callback: Optional[Callable[[str], None]] = None,
     ) -> WorkflowResult:
         """
         Execute hybrid workflow combining orchestrator and few-shot strategies.
@@ -612,6 +620,7 @@ class HybridStrategy(WorkflowStrategy):
                     planning_domain,
                     planning_agents,
                     current_context,
+                    token_callback=token_callback,
                 )
                 steps.extend(planning_result.steps)
 
@@ -654,6 +663,7 @@ class HybridStrategy(WorkflowStrategy):
                     execution_domain,
                     execution_agents,
                     current_context,
+                    token_callback=token_callback,
                 )
                 steps.extend(execution_result.steps)
 
@@ -692,6 +702,7 @@ class HybridStrategy(WorkflowStrategy):
                     validation_domain,
                     validation_agents,
                     current_context,
+                    token_callback=token_callback,
                 )
                 steps.extend(validation_result.steps)
 
@@ -775,3 +786,5 @@ def get_workflow_strategy(domain: DomainConfig) -> WorkflowStrategy:
 
     strategy_class = strategies.get(workflow_type, FewShotStrategy)
     return strategy_class()
+
+

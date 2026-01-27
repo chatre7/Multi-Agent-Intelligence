@@ -4,9 +4,11 @@
 
 import { X, Copy } from "lucide-react";
 import type { Agent } from "../../../domain/entities/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { StateBadge } from "./StateBadge";
 import { SkillPicker } from "../skills/SkillPicker";
+import { apiClient } from "../../../infrastructure/api/apiClient";
+import type { Skill } from "../../../domain/entities/types";
 
 interface AgentDetailProps {
   agent: Agent;
@@ -34,6 +36,57 @@ export function AgentDetail({ agent, onClose, onPromote }: AgentDetailProps) {
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [promoteSuccess, setPromoteSuccess] = useState(false);
   const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false);
+  const [installedSkills, setInstalledSkills] = useState<Skill[]>([]);
+  const [dbSkills, setDbSkills] = useState<Skill[]>([]);
+  const [loadingSkills, setLoadingSkills] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        setLoadingSkills(true);
+        const [all, linked] = await Promise.all([
+          apiClient.listSkills(),
+          apiClient.getAgentSkills(agent.id)
+        ]);
+        setInstalledSkills(all);
+        setDbSkills(linked);
+      } catch (err) {
+        console.error("Failed to load skills:", err);
+      } finally {
+        setLoadingSkills(false);
+      }
+    };
+
+    fetchSkills();
+  }, [agent.id]);
+
+  const handleAttachSkill = async (skillId: string) => {
+    try {
+      await apiClient.attachSkill(agent.id, skillId);
+      const linked = await apiClient.getAgentSkills(agent.id);
+      setDbSkills(linked);
+      setIsSkillPickerOpen(false);
+      setNotification({ message: "Skill attached successfully", type: 'success' });
+      setTimeout(() => setNotification(null), 3000);
+    } catch (err) {
+      setNotification({ message: "Failed to attach skill", type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
+    }
+  };
+
+  const handleDetachSkill = async (skillId: string) => {
+    try {
+      await apiClient.detachSkill(agent.id, skillId);
+      const linked = await apiClient.getAgentSkills(agent.id);
+      setDbSkills(linked);
+      setNotification({ message: "Skill detached successfully", type: 'success' });
+      setTimeout(() => setNotification(null), 3000);
+    } catch (err) {
+      setNotification({ message: "Failed to detach skill", type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
+    }
+  };
 
   const currentState = (agent.state || "DEVELOPMENT") as AgentState;
   const availableTransitions = stateTransitions[currentState] || [];
@@ -64,6 +117,16 @@ export function AgentDetail({ agent, onClose, onPromote }: AgentDetailProps) {
 
   return (
     <div className="fixed inset-0 right-0 top-0 bottom-0 h-full w-full overflow-hidden bg-black/50 transition-opacity duration-200 sm:w-96">
+      {/* Toast Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-[100] p-4 rounded-lg shadow-2xl border flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${notification.type === 'success'
+            ? 'bg-white border-green-100 text-green-800'
+            : 'bg-white border-red-100 text-red-800'
+          }`}>
+          <div className={`h-2 w-2 rounded-full ${notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span className="text-sm font-medium">{notification.message}</span>
+        </div>
+      )}
       <div className="relative h-full w-full overflow-y-auto bg-white shadow-lg">
         {/* Header */}
         <div className="sticky top-0 border-b border-gray-200 bg-white p-6">
@@ -207,59 +270,85 @@ export function AgentDetail({ agent, onClose, onPromote }: AgentDetailProps) {
           <div className="space-y-4 border-t border-gray-200 pt-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Skills</h3>
-              <button
-                onClick={() => setIsSkillPickerOpen(true)}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Manage Skills
-              </button>
-            </div>
-
-            {agent.skills && agent.skills.length > 0 ? (
-              <div className="space-y-2">
-                {agent.skills.map((skillId) => (
-                  <div
-                    key={skillId}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 p-3"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">⚡</span>
-                      <span className="text-sm font-medium text-gray-900">{skillId}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg bg-gray-50 p-4 text-center">
-                <p className="text-sm text-gray-500">No skills assigned</p>
+              <div className="flex items-center gap-2">
+                {loadingSkills && (
+                  <span className="text-xs text-gray-400 animate-pulse">Syncing...</span>
+                )}
                 <button
                   onClick={() => setIsSkillPickerOpen(true)}
-                  className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
                 >
-                  Browse Skill Library
+                  Manage Skills
                 </button>
               </div>
-            )}
+            </div>
+
+            {/* Combined Skills List (YAML + DB) */}
+            <div className="space-y-2">
+              {/* YAML Skills (Un-detachable here as they are in file) */}
+              {agent.skills?.map((skillId) => (
+                <div
+                  key={`yaml-${skillId}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📄</span>
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{skillId}</span>
+                      <p className="text-[10px] text-gray-500 uppercase">From Config</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* DB Skills (Detachable) */}
+              {dbSkills.map((skill) => (
+                <div
+                  key={`db-${skill.id}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/30 p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">⚡</span>
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">{skill.name || skill.id}</span>
+                      <p className="text-[10px] text-blue-500 uppercase font-semibold">Dynamic</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleDetachSkill(skill.id)}
+                    className="text-xs text-red-500 hover:text-red-700 font-medium p-1"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+
+              {(!agent.skills?.length && !dbSkills.length) && (
+                <div className="rounded-lg bg-gray-50 p-4 text-center">
+                  <p className="text-sm text-gray-500">No skills assigned</p>
+                  <button
+                    onClick={() => setIsSkillPickerOpen(true)}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Browse Skill Library
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <SkillPicker
             isOpen={isSkillPickerOpen}
             onClose={() => setIsSkillPickerOpen(false)}
-            onSelect={(skillId) => {
-              console.log("Selected skill:", skillId);
-              // In real implementation, this would call an API to add skill to agent
-              setIsSkillPickerOpen(false);
-            }}
-            installedSkills={[
-              { id: 'python-engineering', name: 'Python Engineering', description: 'Best practices for Python development', version: '1.1.0' },
-              { id: 'software-architecture', name: 'Software Architecture', description: 'Clean Architecture guidelines', version: '1.0.0' },
-              { id: 'web-design-guidelines', name: 'Web Design', description: 'Modern UI/UX principles', version: '1.0.0' }
-            ]}
-            availableSkills={[
-              { id: 'docker-ops', name: 'Docker Operations', description: 'Manage Docker containers and images', latest_version: '2.0.0', versions: ['1.0.0', '2.0.0'], tags: ['devops', 'docker'], author: 'Unknown' },
-              { id: 'aws-cloud', name: 'AWS Cloud', description: 'Manage AWS resources', latest_version: '1.5.0', versions: ['1.5.0'], tags: ['cloud', 'aws'], author: 'CloudTeam' },
-              { id: 'excel-automation', name: 'Excel Automation', description: 'Read and write Excel files', latest_version: '1.2.0', versions: ['1.2.0'], tags: ['office', 'data'], author: 'OfficeBot' }
-            ]}
+            onSelect={handleAttachSkill}
+            installedSkills={installedSkills}
+            availableSkills={installedSkills.map(s => ({
+              ...s,
+              latest_version: s.version,
+              versions: [s.version],
+              tags: [],
+              author: 'Imported'
+            }))}
           />
 
           {/* Metadata */}
