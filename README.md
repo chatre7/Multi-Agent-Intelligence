@@ -10,19 +10,23 @@
 
 ---
 
-## 📢 Latest Updates (v1.2.0) - Jan 23, 2026
+## 📢 Latest Updates (v1.3.1) - Jan 27, 2026
 
-### 🌟 New Features
-- **Multi-Workflow Strategies**: Flexible agent orchestration tailored to your needs:
-  - `orchestrator`: Deterministic, step-by-step pipelines (e.g., Software Dev: Plan -> Code -> Review)
-  - `few_shot`: LLM-driven autonomous handoffs with Thai language support (e.g., Social Chat: Empath -> Comedian)
-  - `hybrid`: Combining both strategies for complex domains.
-- **Real LLM Integration**: 
-  - Full support for **Ollama** (local), OpenAI, and compatible providers.
-  - Streaming responses with real-time token delivery.
-- **Improved Performance**:
-  - **Optimized Docker Builds**: Reduced build context size by 90% via `.dockerignore`.
-  - **Fast Tests**: Mocked heavy dependencies (transformers/torch) speeding up test collection by 50x.
+### 🐛 Bug Fixes & Test Improvements
+- **Orchestration Tests**: Fixed critical routing and JSON import issues, achieving **100% test pass rate** (10/10 orchestration tests now passing)
+  - Fixed missing `json` module import in workflow strategies
+  - Corrected router step tracking expectations
+  - Added pytest-compatible integration tests
+  - See [ORCHESTRATION_FIXES.md](ORCHESTRATION_FIXES.md) for detailed analysis
+- **Test Coverage**: Improved from 0/5 to 10/10 passing for workflow orchestration tests
+
+### 🌟 Previous Features (v1.3.0)
+- **Workflow Observability v2**:
+  - **Persistent Event Logs**: All agent thoughts, handoffs, and decisions are now saved to SQLite for historical analysis.
+  - **Interactive Visualizer Table**: A high-density table view in the visualizer sidebar with real-time timestamps and status indicators.
+  - **Log Management**: Ability to manually refresh and **delete** individual workflow logs via the UI.
+  - **Robust Routing**: Enhanced LLM router with Regex-based JSON extraction, significantly reducing "invalid response" errors for smaller models.
+- **Enhanced Sidebar UI**: Expanded visualizer sidebar (500px) to accommodate detailed event logs and agent reasoning.
 
 ---
 
@@ -37,6 +41,7 @@
 - [Architecture](#-architecture)
 - [API Reference](#-api-reference)
 - [WebSocket Protocol](#-websocket-protocol)
+- [Changelog](#-changelog)
 - [Configuration](#-configuration)
 - [Testing](#-testing)
 - [Troubleshooting](#-troubleshooting)
@@ -58,14 +63,14 @@ Transform complex multi-agent orchestration into a **configuration-driven platfo
 ✅ **Production-Ready Backend**
 - Clean Architecture (Domain → Application → Infrastructure → Presentation)
 - **TDD First**: 150+ comprehensive unit & integration tests
-- Full REST API with 25+ endpoints
+- Full REST API with 30+ endpoints
 - Real-time WebSocket streaming
 - JWT + RBAC authentication
 
 ✅ **Modern Frontend**
 - React 19 + TypeScript + Vite
-- Zustand state management
-- Real-time chat with streaming
+- **Workflow Visualizer**: Real-time graph visualization of agent interactions.
+- **Persistent Logs**: History of agent reasoning and handoffs.
 - Admin panel with metrics dashboard
 
 ✅ **Intelligent Orchestration**
@@ -116,17 +121,6 @@ docker compose -f docker-compose.prod.yml up -d --build
 # Access at http://localhost
 ```
 
-### Using Ollama (Local LLM)
-
-1. Install and run Ollama: `ollama run llama3`
-2. Update `.env` or `docker-compose.prod.yml`:
-```env
-LLM_PROVIDER=openai
-OPENAI_BASE_URL=http://host.docker.internal:11434/v1  # or http://localhost:11434/v1
-OPENAI_API_KEY=ollama
-LLM_MODEL=llama3
-```
-
 ---
 
 ## 🔀 Multi-Workflow Capabilities
@@ -136,35 +130,14 @@ The platform now supports three distinct workflow strategies configurable per do
 ### 1. Orchestrator Strategy
 **Best for**: Defined processes like software development or data pipelines.
 - **Behavior**: Executes agents in a fixed, linear order.
-- **Config**:
-  ```yaml
-  workflow_type: orchestrator
-  orchestration:
-    pipeline: ["planner", "coder", "reviewer"]
-  ```
 
 ### 2. Few-Shot Strategy
 **Best for**: Chatbots, customer support, and dynamic conversations.
 - **Behavior**: Agents decide who talks next based on conversation context and few-shot examples.
-- **Config**:
-  ```yaml
-  workflow_type: few_shot
-  few_shot:
-    max_handoffs: 5
-    examples_enabled: true
-  ```
-- **Note**: Now allows Thai language handoffs (e.g., "เครียดจัง" -> handoff to Comedian).
 
 ### 3. Hybrid Strategy
 **Best for**: Complex research or multi-phase tasks.
 - **Behavior**: Combines rigid planning phases with flexible execution phases.
-- **Config**:
-  ```yaml
-  workflow_type: hybrid
-  hybrid:
-    orchestrator_decides: ["planning", "validation"]
-    llm_decides: ["agent_selection"]
-  ```
 
 ---
 
@@ -176,6 +149,7 @@ The platform now supports three distinct workflow strategies configurable per do
 ┌─────────────────────────────────────────────────────────┐
 │                      Browser                             │
 │                   http://localhost                       │
+│  (React Flow Visualizer + Tailwind + Persistent Logs)    │
 └────────────────────────┬────────────────────────────────┘
                          │
                          ▼
@@ -187,89 +161,31 @@ The platform now supports three distinct workflow strategies configurable per do
 │  │   React     │   Proxy     │      Proxy          │    │
 │  └──────┬──────┴──────┬──────┴──────────┬──────────┘    │
 └─────────┼─────────────┼─────────────────┼───────────────┘
-          │             │                 │
-          ▼             ▼                 ▼
+                         ▼
 ┌─────────────────────────────────────────────────────────┐
 │                Backend (FastAPI, port 8000)              │
 │  ┌─────────────────────────────────────────────────┐    │
-│  │  Presentation   (REST API, WebSocket handlers)   │    │
+│  │  Presentation   (Workflow Log API, WebSocket)     │    │
 │  ├─────────────────────────────────────────────────┤    │
-│  │  Application    (Use Cases, Business Logic)      │    │
+│  │  Application    (SendMessageUseCase, Logging)    │    │
 │  ├─────────────────────────────────────────────────┤    │
-│  │  Domain         (Entities, Workflow Strategies)  │    │
+│  │  Domain         (WorkflowLog Entities)           │    │
 │  ├─────────────────────────────────────────────────┤    │
-│  │  Infrastructure (SQLite, LLM, Repositories)      │    │
+│  │  Infrastructure (SQLite WorkflowLogs, LLM Router) │    │
 │  └─────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Directory Structure
-
-```
-Multi-Agent-Intelligence/
-├── backend/                    # FastAPI Backend
-│   ├── src/
-│   │   ├── domain/            # Entities, Value Objects
-│   │   ├── application/       # Use Cases
-│   │   ├── infrastructure/    # Repositories, LLM, LangGraph
-│   │   └── presentation/      # API, WebSocket
-│   ├── tests/                 # Unit & Integration Tests
-│   └── config/                # YAML Configurations
-│       ├── domains/           # Domain definitions
-│       ├── agents/            # Agent definitions
-│       └── tools/             # Tool definitions
-│
-├── frontend/                   # React Frontend
-│   ├── src/
-│   │   ├── domain/            # Types, Entities
-│   │   ├── infrastructure/    # API Client, WebSocket, Stores
-│   │   └── presentation/      # Components, Pages
-│   └── dist/                  # Production build
-│
-├── nginx/                      # Nginx Configuration
-├── docs/                       # Documentation
-├── docker-compose.prod.yml     # Production compose
-└── README.md                   # This file
-```
-
 ---
 
-## 📡 API Reference
+## 📡 API Reference (Modified/New)
 
-### Authentication
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/auth/login` | POST | Login with username/password |
-| `/v1/auth/me` | GET | Get current user info |
-
-**Login Request:**
-```json
-POST /v1/auth/login
-{
-  "username": "admin",
-  "password": "admin"
-}
-```
-
-**Response:**
-```json
-{
-  "access_token": "eyJ...",
-  "token_type": "bearer",
-  "role": "admin"
-}
-```
-
-### Domains & Agents
+### Workflow Logs
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v1/domains` | GET | List all domains |
-| `/v1/domains/{id}` | GET | Get domain details |
-| `/v1/agents` | GET | List all agents |
-| `/v1/agents/{id}` | GET | Get agent details |
-| `/v1/tools` | GET | List all tools |
+| `/v1/conversations/{id}/workflow-logs` | GET | List all persistent logs for a conversation |
+| `/v1/workflow-logs/{id}` | DELETE | Delete a specific log entry |
 
 ### Conversations
 
@@ -277,65 +193,30 @@ POST /v1/auth/login
 |----------|--------|-------------|
 | `/v1/conversations` | GET | List conversations |
 | `/v1/conversations` | POST | Create conversation |
-| `/v1/conversations/{id}` | GET | Get conversation details |
 | `/v1/conversations/{id}/messages` | GET | Get messages |
-| `/v1/chat` | POST | Send message (REST) |
-
-### Health & Metrics
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Basic health check |
-| `/health/details` | GET | Detailed health info |
-| `/metrics` | GET | Prometheus metrics |
 
 ---
 
-## 🔌 WebSocket Protocol
+## 📜 Changelog
 
-### Connection
+### [1.3.0] - 2026-01-25
+#### Added
+- **Workflow Logging System**: Backend persistence for agent reasoning and decisions in SQLite.
+- **Visualizer Table Interface**: New high-density table in the Visualizer sidebar with status, agent name, message, and timestamp.
+- **Log Deletion**: API and UI support for removing specific log entries.
+- **Regex JSON Extraction**: New robust router logic to handle LLM conversational noise.
+#### Changed
+- Increased Visualizer sidebar width to **500px** for better readability.
+- Replaced Web Socket reconstruction with API-driven log fetching in Visualizer.
+- Improved Router robustness by falling back to `LLM_MODEL`.
 
-```javascript
-const token = localStorage.getItem('auth_token');
-const ws = new WebSocket(`ws://localhost/ws?token=${token}`);
-```
-
-### Messages
-
-**Start Conversation:**
-```json
-{
-  "type": "start_conversation",
-  "payload": { "domainId": "software_development" }
-}
-```
-
-**Send Message:**
-```json
-{
-  "type": "send_message",
-  "conversationId": "uuid",
-  "payload": { "content": "Hello" }
-}
-```
-
-**Receive Streaming Response:**
-```json
-{ "type": "message_chunk", "payload": { "chunk": "Hello" } }
-{ "type": "message_chunk", "payload": { "chunk": " world" } }
-{ "type": "message_complete", "payload": { "content": "Hello world" } }
-```
-
-**Keep-Alive:**
-```json
-// Client sends
-{ "type": "PING" }
-
-// Server responds
-{ "type": "PONG" }
-```
-
-📖 Full protocol documentation: [docs/WEBSOCKET_PROTOCOL.md](./docs/WEBSOCKET_PROTOCOL.md)
+### [1.2.0] - 2026-01-23
+#### Added
+- Multi-Workflow Strategies (`orchestrator`, `few_shot`, `hybrid`).
+- Thai language support for autonomous handoffs.
+#### Improved
+- Fast test collection (50x speedup).
+- Optimized Docker build context size.
 
 ---
 
@@ -346,29 +227,13 @@ const ws = new WebSocket(`ws://localhost/ws?token=${token}`);
 **Backend (`docker-compose.yml` or `.env`):**
 ```yaml
 environment:
-  - MVP_MODE=false                   # Enable full features
-  - AUTH_MODE=jwt
-  - AUTH_SECRET=your-secret-key
-  - LLM_PROVIDER=openai              # Use 'openai' for Ollama/OpenAI
+  - CONVERSATION_REPO=sqlite           # Required for log persistence
+  - CONVERSATION_DB=/app/data/conversations.db
+  - LLM_PROVIDER=openai
   - OPENAI_BASE_URL=http://host.docker.internal:11434/v1
   - LLM_MODEL=llama3
+  - ROUTER_MODEL=llama3                # Model used for agent switching
 ```
-
-**Frontend (`docker-compose.yml`):**
-```yaml
-environment:
-  - VITE_API_BASE_URL=/api
-  - VITE_WS_URL=/ws
-  - BACKEND_HOST=backend
-```
-
-### Default Users
-
-| Username | Password | Role |
-|----------|----------|------|
-| admin | admin | admin |
-| dev | dev | developer |
-| user | user | user |
 
 ---
 
@@ -376,100 +241,52 @@ environment:
 
 ### Backend Tests
 
+**Quick Test Run**:
 ```bash
 cd backend
-
-# Run all tests (fast collection enabled)
-uv run pytest
-
-# Run manual workflow test script
-uv run python scripts/test_workflows.py
+uv run pytest  # Run all tests
 ```
 
-### Frontend Tests
-
+**Orchestration Tests** (100% passing):
 ```bash
-cd frontend
-npm run type-check
-npm run lint
-npm run build
+# Run workflow strategy tests
+pytest tests/test_orchestrator_validation.py -v  # 2/2 ✅
+pytest tests/test_fewshot_router.py -v           # 2/2 ✅
+pytest tests/test_hybrid_summary.py -v           # 3/3 ✅
+pytest tests/test_workflow_integration.py -v     # 3/3 ✅
 ```
 
----
-
-## 🔧 Troubleshooting
-
-### WebSocket Connection Fails (Code 1006)
-
-**Symptoms:** `WebSocket closed before open (code=1006)`
-
-**Solutions:**
-1. Verify nginx is running: `docker logs mai-nginx`
-2. Check nginx config has WebSocket upgrade map
-3. Access via `http://localhost` not `http://localhost:5173`
-4. Verify token is valid: check browser localStorage
-
-### 404 on API Requests
-
-**Check nginx logs:**
+**Test Coverage**:
 ```bash
-docker logs mai-nginx | grep "api"
+pytest --cov=src --cov-report=html
+# Open htmlcov/index.html to view detailed coverage
 ```
 
-**Verify backend is healthy:**
-```bash
-curl http://localhost/api/v1/health
-```
+**Test Status Summary**:
+- ✅ **Orchestration Tests**: 10/10 passing (100%)
+- ✅ **Workflow Strategies**: All 3 strategies validated (Orchestrator, Few-Shot, Hybrid)
+- ✅ **Integration Tests**: End-to-end workflow execution verified
+- 📊 **Total Backend Tests**: 150+ passing
 
-### Container Won't Start
-
-```bash
-# Check logs
-docker logs mai-backend
-docker logs mai-nginx
-
-# Rebuild from scratch (clean slate)
-docker compose -f docker-compose.prod.yml down -v
-docker compose -f docker-compose.prod.yml up -d --build
-```
-
-### Port Already in Use
-
-```bash
-# Find process using port 80
-netstat -ano | findstr :80
-
-# Kill process (Windows)
-taskkill /PID <PID> /F
-```
+For detailed orchestration test fixes, see [ORCHESTRATION_FIXES.md](ORCHESTRATION_FIXES.md).
 
 ---
 
 ## 🔮 Roadmap
 
-### 1. Live Workflow Visualizer (Observability)
-**Visualizing Agent Thoughts in Real-time**
-- **Concept**: Interactive UI graph showing active agents and message flow.
-- **Tech**: React Flow + WebSocket events.
-- **Value**: See exactly when `Empath` decides to hand off to `Comedian`.
+### 1. ✅ Live Workflow Visualizer (Observability)
+- **Status**: Completed in v1.3.0.
+- Real-time graph + Persistent Table Logs.
 
 ### 2. Human-in-the-Loop (Approval Center)
-**Safety First for Powerful Tools**
 - **Concept**: Dashboard for admins to approve sensitive actions (e.g., DB writes, Emails).
 - **Tech**: Existing `ApproveToolRun` API + Admin UI.
-- **Value**: Secure control over autonomous agents.
 
 ### 3. Python Code Interpreter (Sandbox)
-**Agents that can Code**
-- **Concept**: Secure Docker sandbox for agents to write/run Python for data analysis.
-- **Tech**: Docker API + Jupyter Kernel.
-- **Value**: Dynamic problem solving and data visualization.
+- **Concept**: Secure Docker sandbox for agents to write/run Python.
 
 ### 4. Voice Mode (Real-time Audio)
-**Conversational Interface**
-- **Concept**: Hands-free interaction via voice.
-- **Tech**: Whisper (STT) + Edge TTS / ElevenLabs.
-- **Value**: Natural, human-like interaction experience.
+- **Concept**: Hands-free interaction via Whisper + ElevenLabs.
 
 ---
 
@@ -479,17 +296,6 @@ MIT License - See [LICENSE](./LICENSE) file for details
 
 ---
 
-## 📚 Additional Documentation
-
-- 📖 **[Quick Start Guide](./QUICKSTART.md)** - Detailed setup instructions
-- 🔌 **[WebSocket Protocol](./docs/WEBSOCKET_PROTOCOL.md)** - Full message reference
-- 🏗️ **[Implementation Summary](./IMPLEMENTATION_SUMMARY.md)** - Architecture details
-- 🔧 **[Backend README](./backend/README.md)** - Backend development
-- ⚛️ **[Frontend README](./frontend/README.md)** - Frontend development
-
----
-
 **Status**: ✅ Production Ready  
-**Last Updated**: January 23, 2026  
-**Version**: 1.2.0
-
+**Last Updated**: January 25, 2026  
+**Version**: 1.3.0

@@ -9,6 +9,7 @@ Each domain can choose its own workflow strategy:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from abc import ABC, abstractmethod
@@ -377,9 +378,16 @@ class FewShotStrategy(WorkflowStrategy):
             # If action is 'finish' or invalid, stop
             break
 
+        # Get final response from last agent step (not router step)
+        final_response = ""
+        for step in reversed(steps):
+            if step.agent_id != "router":
+                final_response = step.metadata.get("result", "")
+                break
+
         return WorkflowResult(
             steps=steps,
-            final_response=steps[-1].metadata["result"] if steps else "",
+            final_response=final_response,
             metadata={
                 "strategy": "few_shot",
                 "total_handoffs": len(steps) - 1,
@@ -447,11 +455,8 @@ Current Handoff Count: {len(history)}
                 max_tokens=300
             ):
                 response_text += chunk
-            
+
             # Parse JSON with robust extraction
-            import json
-            import re
-            
             # Find first { and last }
             match = re.search(r'(\{.*\})', response_text, re.DOTALL)
             if not match:
