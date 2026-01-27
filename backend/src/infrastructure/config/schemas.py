@@ -68,6 +68,7 @@ AGENT_SCHEMA: dict = {
         "max_tokens": {"type": "integer", "minimum": 1},
         "timeout_seconds": {"type": "number", "minimum": 1},
         "keywords": {"type": "array", "items": {"type": "string"}},
+        "skills": {"type": "array", "items": {"type": "string"}},
         "priority": {"type": "integer"},
         "author": {"type": "string"},
         "metadata": {"type": "object"},

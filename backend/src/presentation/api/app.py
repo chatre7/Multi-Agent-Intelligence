@@ -84,6 +84,7 @@ from src.presentation.metrics import (
     TOOL_RUNS_REJECTED_TOTAL,
     TOOL_RUNS_REQUESTED_TOTAL,
 )
+from src.infrastructure.config.skill_importer import SkillImporter
 from src.presentation.websocket.handlers import register_websocket_routes
 
 _CONVERSATION_CURSOR_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T.+\|[0-9a-fA-F-]{8,}$")
@@ -134,6 +135,11 @@ class RegistryAgentBumpVersionRequest(BaseModel):
 
 class RegistryAgentHeartbeatRequest(BaseModel):
     pass
+
+
+class SkillImportRequest(BaseModel):
+    url: str = Field(..., min_length=1)
+    branch: str | None = None
 
 
 def create_app() -> FastAPI:
@@ -628,6 +634,34 @@ def create_app() -> FastAPI:
         if tool is None:
             raise HTTPException(status_code=404, detail="Unknown tool_id")
         return tool.to_dict()
+
+    @app.post("/v1/skills/import")
+    def import_skill(
+        payload: SkillImportRequest,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _sub, role, perms = resolve_principal(
+            x_role=x_role, authorization=authorization
+        )
+        try:
+            require_permission_set(perms, Permission.AGENT_WRITE)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        skills_dir = loader.config_root / "skills"
+        importer = SkillImporter(skills_dir)
+        try:
+            skill = importer.import_from_git(payload.url, payload.branch)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return {
+            "id": skill.id,
+            "name": skill.name,
+            "version": skill.version,
+            "description": skill.description,
+        }
 
     @app.post("/v1/chat")
     def chat(

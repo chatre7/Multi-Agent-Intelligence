@@ -9,6 +9,7 @@ from .conversation import Conversation
 from .domain_config import DomainConfig, RoutingRule
 from .message import Message
 from .registered_agent import RegisteredAgent
+from .skill import Skill
 from .tool import Tool
 from .tool_run import ToolRun
 
@@ -23,6 +24,8 @@ __all__ = [
     # Conversations and messages
     "Conversation",
     "Message",
+    # Skills
+    "Skill",
     # Tools and executions
     "Tool",
     "ToolRun",

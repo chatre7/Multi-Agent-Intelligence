@@ -63,6 +63,7 @@ class Agent:
     max_tokens: int = 4096
     timeout_seconds: float = 120.0
     keywords: list[str] = field(default_factory=list)
+    skills: list[str] = field(default_factory=list)
     priority: int = 0
     author: str = "system"
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -199,6 +200,7 @@ class Agent:
             "max_tokens": self.max_tokens,
             "timeout_seconds": self.timeout_seconds,
             "keywords": self.keywords.copy(),
+            "skills": self.skills.copy(),
             "priority": self.priority,
             "author": self.author,
             "created_at": self.created_at.isoformat(),
@@ -256,6 +258,7 @@ class Agent:
             max_tokens=data.get("max_tokens", 4096),
             timeout_seconds=data.get("timeout_seconds", 120.0),
             keywords=data.get("keywords", []),
+            skills=data.get("skills", []),
             priority=data.get("priority", 0),
             author=data.get("author", "system"),
             created_at=created_at,

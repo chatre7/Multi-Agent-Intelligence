@@ -174,6 +174,14 @@ export class ApiClient {
     );
     return response.data;
   }
+
+  async importSkill(url: string, branch?: string): Promise<{ id: string, name: string, version: string }> {
+    const response = await this.client.post("/skills/import", {
+      url,
+      branch
+    });
+    return response.data;
+  }
 }
 
 export const apiClient = new ApiClient(resolveApiBaseUrl());

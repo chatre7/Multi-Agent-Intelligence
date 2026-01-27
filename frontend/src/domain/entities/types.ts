@@ -11,6 +11,8 @@ export interface Agent {
   state: 'DEVELOPMENT' | 'TESTING' | 'PRODUCTION' | 'DEPRECATED' | 'ARCHIVED';
   capabilities: string[];
   keywords: string[];
+  skills?: string[]; // List of skill IDs (e.g., "python-engineering@^1.0.0")
+
 }
 
 export interface DomainConfig {
@@ -56,4 +58,24 @@ export interface User {
   username: string;
   role: 'ADMIN' | 'DEVELOPER' | 'OPERATOR' | 'USER' | 'GUEST';
   permissions: string[];
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  instructions?: string;
+  tools?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface RegistrySkill {
+  id: string;
+  name: string;
+  description: string;
+  latest_version: string;
+  versions: string[];
+  tags: string[];
+  author: string;
 }

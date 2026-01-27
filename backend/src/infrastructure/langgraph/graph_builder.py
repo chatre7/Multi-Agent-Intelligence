@@ -26,6 +26,9 @@ from src.domain.entities.handoff import HandoffRequest
 from src.infrastructure.tools.registry import ToolRegistry
 from src.infrastructure.persistence.chroma.memory_repository import ChromaMemoryRepository
 from src.infrastructure.langgraph.memory_utils import extract_facts
+from src.infrastructure.config.skill_loader import SkillLoader
+from src.application.use_cases.skills import get_effective_system_prompt
+from pathlib import Path
 
 
 class ChatMessage(TypedDict, total=False):
@@ -243,7 +246,16 @@ class ConversationGraphBuilder:
                         print(f"[DEBUG] Memory search failed: {e}")
 
                 # 2. Format system prompt with Agent instructions + Tool instructions + Memory
-                base_system_prompt = agent.system_prompt or "You are a helpful assistant."
+                # Load skills for this agent
+                skill_loader = SkillLoader(Path("backend/configs/skills"))
+                loaded_skills = []
+                for skill_id in agent.skills:
+                    skill = skill_loader.load_skill(skill_id)
+                    if skill:
+                        loaded_skills.append(skill)
+                
+                # Get effective system prompt (includes skill instructions)
+                base_system_prompt = get_effective_system_prompt(agent, loaded_skills)
                 
                 if memories:
                     memory_context = "\n- ".join(memories)

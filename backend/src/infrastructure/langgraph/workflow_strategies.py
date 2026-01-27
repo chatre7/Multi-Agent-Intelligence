@@ -28,6 +28,11 @@ except ImportError:
     # Graceful fallback for testing without full dependencies
     def llm_from_env(): return None
 
+# Import skill system
+from src.infrastructure.config.skill_loader import SkillLoader
+from src.application.use_cases.skills import get_effective_system_prompt
+from pathlib import Path
+
 
 @dataclass
 class WorkflowStep:
@@ -247,11 +252,21 @@ class OrchestratorStrategy(WorkflowStrategy):
                 # Default fallback: check env or use 'llama3' for Ollama
                 model = os.getenv("LLM_MODEL", "llama3")
 
+            # Load skills and get effective system prompt
+            skill_loader = SkillLoader(Path("backend/configs/skills"))
+            loaded_skills = []
+            for skill_id in agent.skills:
+                skill = skill_loader.load_skill(skill_id)
+                if skill:
+                    loaded_skills.append(skill)
+            
+            effective_prompt = get_effective_system_prompt(agent, loaded_skills)
+
             # Collect full response from stream
             full_response = ""
             for chunk in llm.stream_chat(
                 model=model,
-                system_prompt=agent.system_prompt,
+                system_prompt=effective_prompt,
                 messages=messages,
                 temperature=0.7,
                 max_tokens=2000,
@@ -499,10 +514,20 @@ Decision: {"action": "handoff", "target_agent": "coder", "reason": "Move to impl
             llm = llm_from_env()
             if llm is None: raise ImportError("No LLM")
             
+            # Load skills and get effective system prompt
+            skill_loader = SkillLoader(Path("backend/configs/skills"))
+            loaded_skills = []
+            for skill_id in agent.skills:
+                skill = skill_loader.load_skill(skill_id)
+                if skill:
+                    loaded_skills.append(skill)
+            
+            effective_prompt = get_effective_system_prompt(agent, loaded_skills)
+            
             full_resp = ""
             for chunk in llm.stream_chat(
                 model=agent.model_name or "default",
-                system_prompt=agent.system_prompt,
+                system_prompt=effective_prompt,
                 messages=[{"role": "user", "content": task}],
                 temperature=0.7,
                 max_tokens=2000

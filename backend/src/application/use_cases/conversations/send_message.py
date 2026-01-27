@@ -19,6 +19,9 @@ from src.domain.repositories.workflow_log_repository import IWorkflowLogReposito
 from src.infrastructure.config import ConfigBundle, YamlConfigLoader
 from src.infrastructure.langgraph import ConversationGraphBuilder, ConversationState
 from src.infrastructure.llm import StreamingLLM
+from src.infrastructure.config.skill_loader import SkillLoader
+from src.application.use_cases.skills import get_effective_system_prompt
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -144,10 +147,20 @@ class SendMessageUseCase:
                 
             agent_id = selected_agent
             
+            # Load skills and get effective system prompt
+            skill_loader = SkillLoader(Path("backend/configs/skills"))
+            loaded_skills = []
+            for skill_id in agent.skills:
+                skill = skill_loader.load_skill(skill_id)
+                if skill:
+                    loaded_skills.append(skill)
+            
+            effective_prompt = get_effective_system_prompt(agent, loaded_skills)
+            
             reply_parts: list[str] = []
             for chunk in self.llm.stream_chat(
                 model=agent.model_name,
-                system_prompt=agent.system_prompt,
+                system_prompt=effective_prompt,
                 messages=[{"role": "user", "content": request.message}],
                 temperature=agent.temperature,
                 max_tokens=agent.max_tokens,
@@ -302,11 +315,21 @@ class SendMessageUseCase:
 
             final_agent_id = selected_agent_final
 
+            # Load skills and get effective system prompt
+            skill_loader = SkillLoader(Path("backend/configs/skills"))
+            loaded_skills = []
+            for skill_id in agent.skills:
+                skill = skill_loader.load_skill(skill_id)
+                if skill:
+                    loaded_skills.append(skill)
+            
+            effective_prompt = get_effective_system_prompt(agent, loaded_skills)
+
             reply_parts: list[str] = []
             llm_messages = [{"role": "user", "content": request.message}]
             for chunk in self.llm.stream_chat(
                 model=agent.model_name,
-                system_prompt=agent.system_prompt,
+                system_prompt=effective_prompt,
                 messages=llm_messages,
                 temperature=agent.temperature,
                 max_tokens=agent.max_tokens,

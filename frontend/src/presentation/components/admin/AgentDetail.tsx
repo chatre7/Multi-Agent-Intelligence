@@ -6,6 +6,7 @@ import { X, Copy } from "lucide-react";
 import type { Agent } from "../../../domain/entities/types";
 import { useState } from "react";
 import { StateBadge } from "./StateBadge";
+import { SkillPicker } from "../skills/SkillPicker";
 
 interface AgentDetailProps {
   agent: Agent;
@@ -32,6 +33,7 @@ export function AgentDetail({ agent, onClose, onPromote }: AgentDetailProps) {
   const [isPromoting, setIsPromoting] = useState(false);
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [promoteSuccess, setPromoteSuccess] = useState(false);
+  const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false);
 
   const currentState = (agent.state || "DEVELOPMENT") as AgentState;
   const availableTransitions = stateTransitions[currentState] || [];
@@ -200,6 +202,65 @@ export function AgentDetail({ agent, onClose, onPromote }: AgentDetailProps) {
               </div>
             </div>
           )}
+
+          {/* Skills Section */}
+          <div className="space-y-4 border-t border-gray-200 pt-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Skills</h3>
+              <button
+                onClick={() => setIsSkillPickerOpen(true)}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Manage Skills
+              </button>
+            </div>
+
+            {agent.skills && agent.skills.length > 0 ? (
+              <div className="space-y-2">
+                {agent.skills.map((skillId) => (
+                  <div
+                    key={skillId}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">⚡</span>
+                      <span className="text-sm font-medium text-gray-900">{skillId}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg bg-gray-50 p-4 text-center">
+                <p className="text-sm text-gray-500">No skills assigned</p>
+                <button
+                  onClick={() => setIsSkillPickerOpen(true)}
+                  className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Browse Skill Library
+                </button>
+              </div>
+            )}
+          </div>
+
+          <SkillPicker
+            isOpen={isSkillPickerOpen}
+            onClose={() => setIsSkillPickerOpen(false)}
+            onSelect={(skillId) => {
+              console.log("Selected skill:", skillId);
+              // In real implementation, this would call an API to add skill to agent
+              setIsSkillPickerOpen(false);
+            }}
+            installedSkills={[
+              { id: 'python-engineering', name: 'Python Engineering', description: 'Best practices for Python development', version: '1.1.0' },
+              { id: 'software-architecture', name: 'Software Architecture', description: 'Clean Architecture guidelines', version: '1.0.0' },
+              { id: 'web-design-guidelines', name: 'Web Design', description: 'Modern UI/UX principles', version: '1.0.0' }
+            ]}
+            availableSkills={[
+              { id: 'docker-ops', name: 'Docker Operations', description: 'Manage Docker containers and images', latest_version: '2.0.0', versions: ['1.0.0', '2.0.0'], tags: ['devops', 'docker'], author: 'Unknown' },
+              { id: 'aws-cloud', name: 'AWS Cloud', description: 'Manage AWS resources', latest_version: '1.5.0', versions: ['1.5.0'], tags: ['cloud', 'aws'], author: 'CloudTeam' },
+              { id: 'excel-automation', name: 'Excel Automation', description: 'Read and write Excel files', latest_version: '1.2.0', versions: ['1.2.0'], tags: ['office', 'data'], author: 'OfficeBot' }
+            ]}
+          />
 
           {/* Metadata */}
           <div className="space-y-4 border-t border-gray-200 pt-6">
