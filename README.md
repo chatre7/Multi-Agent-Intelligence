@@ -4,6 +4,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-green)
 ![Backend Tests](https://img.shields.io/badge/Backend%20Tests-150%2B%20passing-green)
+![Threads](https://img.shields.io/badge/Threads-Persistence%20%2B%20History-blueviolet)
 ![Streaming](https://img.shields.io/badge/Streaming-Real--time%20Tokens-blue)
 ![Frontend](https://img.shields.io/badge/Frontend-React%2019%2BVite-blue)
 ![Docker](https://img.shields.io/badge/Docker-Production%20Ready-blue)
@@ -11,17 +12,21 @@
 
 ---
 
-## 📢 Latest Updates (v1.4.0) - Jan 27, 2026
+## 📢 Latest Updates (v1.6.0) - Jan 28, 2026
 
-### 🚀 Real-Time Token Streaming & Reliability
-- **Smooth Streaming UI**: Tokens now stream character-by-character to the frontend, even when executing complex multi-agent workflows. 
-- **Concurrency Overhaul**: Implemented a `Thread + Queue` pattern in the `SendMessageUseCase` to capture side-channel tokens from LangGraph nodes without blocking the event loop.
-- **Workflow Callback System**: Added `token_callback` support to `OrchestratorStrategy`, `Few-ShotStrategy`, and `HybridStrategy`, ensuring complete transparency during agent reasoning.
-- **LLM Robustness**: 
-  - Fixed critical `TypeError` where `max_tokens` was missing in internal LLM calls.
-  - Enforced strict token limit validation based on agent YAML configuration.
-  - Successfully tested with **Large Language Models** (120B+ parameters) via Ollama/OpenAI adapters.
-- **Infrastructure Stability**: Resolved Nginx production healthcheck issues by switching to local IPv4 loopback (127.0.0.1).
+### 🧵 Threads Persistence & Deep-Linking
+- **Stateful Refresh**: Threads now support `/threads/:id` routing. Refreshing the browser no longer loses simulation state.
+- **Full History Preservation**: Backend now persists *every* agent message in a multi-agent simulation, not just the final response.
+- **Recent Threads Sidebar**: A new "Recent Threads" section in the sidebar allows users to quickly jump between past simulations.
+
+### 🎭 Social Simulation Engine v1.1
+- **Balanced Participation**: Implemented a **Round-Robin** speaker selection to ensure equal participation from all agents in a domain.
+- **Aggressive Sanitization**: Multi-stage regex cleaning removes LLM artifacts (like `<think>` leftovers, role classifications, or scores) for a pure conversational experience.
+- **Domain Isolation**: Agents are now strictly filtered based on the active domain configuration.
+
+### 🧠 Thinking Mode & Integrated Reasoning (v1.5)
+- **Per-Conversation Toggle**: Control visibility of the AI's reasoning process per chat.
+- **Integrated UI**: Reasoning is embedded with a collapsible, "Deep Research" inspired design.
 
 ---
 
@@ -49,6 +54,15 @@
 Transform complex multi-agent orchestration into a **configuration-driven platform** where domains and agents are defined via YAML files, synced to SQLite, and exposed through a modern React UI with **instant streaming feedback**.
 
 ### Key Features
+
+✅ **Stateful Threads & History** (New)
+- **Deep Linking**: Direct access/refresh support via `/threads/:id`.
+- **Simulation Persistence**: All intermediate agent posts are saved to the database.
+- **Recents Navigation**: Sidebar integration for quick thread switching.
+
+✅ **Advanced Reasoning & Observability**
+- **Thinking Mode**: Toggleable Chain-of-Thought visibility for deep reasoning tasks.
+- **Skill Badges**: Real-time visual feedback when agents apply specific skills.
 
 ✅ **Streaming Orchestration**
 - Character-by-character token delivery even across multi-agent handoffs.
@@ -123,37 +137,65 @@ Every domain can utilize a specific strategy defined in its metadata:
 
 ## 🏗️ Architecture
 
-### Real-Time Streaming Flow (v1.4.0)
+### Real-Time Streaming Flow (v1.5.0)
 
 ```
 [UI] <--- (SSE/WebSocket) --- [FastAPI] --- (Queue) <--- [Streaming Thread]
-                                                             │
-                                                     [LangGraph Execution]
-                                                             │
-                                                     [Agent Node 1 (Streamed)]
-                                                             │
-                                                     [Agent Node 2 (Streamed)]
+                                                              │
+                                                      [LangGraph Execution]
+                                                              │
+                                                      [Agent Node] --(Stream)--> [Tokens]
+                                                              │
+                                                      [Thought Extraction Engine]
+                                                              │
+                                                 (Intercepts <think> & [SKILL] tags)
 ```
 
-This architecture ensures that as soon as an LLM provider (Ollama/OpenAI) yields a token, it is pushed through the side-channel queue and emitted to the user, bypassing the traditional "wait-for-finish" bottleneck of LangGraph nodes.
+This architecture ensures that as soon as an LLM provider yields a token, it is pushed through a side-channel queue. Simultaneously, the **Thought Extraction Engine** scans for semantic tags (`<think>`, `[USING SKILL]`) to update the UI state (e.g., showing a badge or expanding a card) **before** the text even renders, enhancing perceived responsiveness.
+
+---
+
+## 🚧 Known Issues
+
+### 🤖 Social Simulation Artifacts
+While the `social_simulation` strategy provides a realistic autonomous thread experience, some models may still exhibit **Prompt Leakage** or **Technical Meta-data** in their outputs (e.g., orphaned `</likes>` tags or role classification lists like `Test Engineer: 1`).
+
+- **Current Mitigation**: A regex-based sanitizer in `SocialSimulationStrategy._clean_content` strips most common artifacts.
+- **Future Fix**: We plan to improve the system prompt robustness and implement a Pydantic-based output validator to ensure 100% clean casual text.
 
 ---
 
 ## 📜 Changelog
 
+### [1.6.0] - 2026-01-28
+#### Added
+- **Threads Persistence**: Multi-message saving for social simulations.
+- **Thread History UI**: "Recent Threads" sidebar component.
+- **Deep Routing**: URL support for individual threads (`/threads/:id`).
+- **Round-Robin Selection**: Balanced agent participation in simulations.
+#### Fixed
+- **Simulation Cleanup**: Aggressive regex cleaning for LLM artifacts/scores.
+- **Entity Stability**: Added missing `metadata` attribute to `Agent` entities.
+- **LLM Invocations**: Switched from `.invoke()` to `.stream_chat()` for OpenAI-compatible providers.
+- **Frontend Build**: Resolved missing API client methods and relative import path level errors.
+
+### [1.5.0] - 2026-01-28
+#### Added
+- **Thinking Mode Toggle**: Per-conversation UI toggle to enable/disable reasoning display.
+- **Skill Observability**: "Zap Badges" that appear in real-time when agents apply skills.
+- **Integrated Reasoning UI**: Redesigned "Thinking" section with "Deep Research" aesthetics (collapsible, attributed).
+#### Changed
+- **System Prompt Injection**: Dynamic injection of thinking instructions based on client-side toggle.
+- **Token Streaming**: Enhanced `WebSocketClient` to handle `isStreaming` state more accurately during handoffs.
+#### Fixed
+- **Handoff Persistence**: Resolved bug where thoughts disappeared when switching agents.
+- **Data Ingestion**: Fixed unwrapping of WebSocket payloads for thought events.
+- **Strategy Context**: Fixed `FewShotStrategy` ignoring initial system messages.
+
 ### [1.4.0] - 2026-01-27
 #### Added
-- **Token Streaming Side-Channel**: Implementation of `queue.Queue` and `threading.Thread` in `SendMessageUseCase.stream` to allow real-time token delivery from inside LangGraph nodes.
+- **Token Streaming Side-Channel**: Implementation of `queue.Queue` and `threading.Thread` in `SendMessageUseCase.stream`.
 - **Workflow Callback Interface**: New `token_callback` parameter added to all `WorkflowStrategy` execution methods.
-- **Storyteller Verification**: Confirmed and fixed streaming for high-token creative agents.
-#### Fixed
-- **LLM Signatures**: Corrected `max_tokens` argument missing in internal LLM factory calls causing system crashes.
-- **Nginx Healthcheck**: Fixed production image failing healthchecks due to `localhost` resolution issues in Alpine/Debian containers.
-
-### [1.3.1] - 2026-01-25
-#### Added
-- **Workflow Logging**: Backend persistence for agent reasoning and decisions in SQLite.
-- **Regex JSON Extraction**: Enhanced router robustness for smaller model parsing.
 
 ---
 
@@ -197,4 +239,4 @@ MIT License - See [LICENSE](./LICENSE) file for details
 ---
 
 **Status**: ✅ Production Ready  
-**Version**: 1.4.0 | **Updated**: January 27, 2026
+**Version**: 1.6.0 | **Updated**: January 28, 2026

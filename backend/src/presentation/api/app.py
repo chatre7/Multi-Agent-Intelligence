@@ -892,6 +892,37 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Unknown conversation_id")
         return convo.to_dict()
 
+    @app.post("/v1/chat/send")
+    def send_message_http(
+        payload: ChatRequest,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        """HTTP endpoint for sending messages (non-streaming)."""
+        sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            require_permission_set(perms, Permission.CHAT_SEND)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+        # Execute synchronously
+        try:
+            request = SendMessageRequest(
+                domain_id=payload.domain_id,
+                message=payload.message,
+                conversation_id=payload.conversation_id,
+                role=role,
+                subject=sub,
+                # Force thinking false for HTTP by default unless we update ChatRequest
+                enable_thinking=False 
+            )
+            # 'use_case' is the SendMessageUseCase instance
+            result = use_case.execute(request)
+            return asdict(result) # SendMessageResponse -> dict
+        except Exception as e:
+            logger.error(f"Chat send failed: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
     @app.get("/v1/conversations/{conversation_id}/messages")
     def list_conversation_messages(
         conversation_id: str,

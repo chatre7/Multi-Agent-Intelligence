@@ -70,6 +70,7 @@ class Agent:
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     test_results: dict[str, Any] = field(default_factory=dict)
     performance_metrics: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def can_handle(self, intent: str, keywords: list[str]) -> float:
         """
@@ -207,6 +208,7 @@ class Agent:
             "updated_at": self.updated_at.isoformat(),
             "test_results": self.test_results.copy(),
             "performance_metrics": self.performance_metrics.copy(),
+            "metadata": self.metadata.copy(),
         }
 
     @classmethod
@@ -265,6 +267,7 @@ class Agent:
             updated_at=updated_at,
             test_results=data.get("test_results", {}),
             performance_metrics=data.get("performance_metrics", {}),
+            metadata=data.get("metadata", {}),
         )
 
     def __str__(self) -> str:

@@ -19,6 +19,8 @@ capabilities:
   - storytelling
   - creative_writing
   - narrative_design
+skills:
+  - the_narrative_architect
 tools:
   - transfer_to_agent
 model_name: "gpt-oss:120b-cloud"

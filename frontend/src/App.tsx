@@ -3,7 +3,8 @@ import { Routes, Route, Link, useLocation, Navigate } from "react-router";
 import LoginPage from "./presentation/pages/LoginPage";
 import ChatPage from "./presentation/pages/ChatPage";
 import AdminPage from "./presentation/pages/AdminPage";
-import { BarChart3, MessageCircle, Route as RouteIcon } from "lucide-react";
+import ThreadsPage from './presentation/pages/ThreadsPage';
+import { BarChart3, MessageCircle, Route as RouteIcon, Hash } from "lucide-react";
 import { apiClient } from "./infrastructure/api/apiClient";
 import { useAuthStore } from "./infrastructure/stores/authStore";
 import "./App.css";
@@ -19,8 +20,8 @@ function NavLink({ to, children, icon: Icon }: { to: string; children: React.Rea
     <Link
       to={to}
       className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${isActive
-          ? "bg-blue-100 text-blue-700"
-          : "text-gray-600 hover:bg-gray-100"
+        ? "bg-blue-100 text-blue-700"
+        : "text-gray-600 hover:bg-gray-100"
         }`}
     >
       <Icon size={20} />
@@ -45,6 +46,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
           <NavLink to="/" icon={MessageCircle}>Chat</NavLink>
           <NavLink to="/admin" icon={BarChart3}>Admin</NavLink>
           <NavLink to="/visualizer" icon={RouteIcon}>Visualizer</NavLink>
+          <NavLink to="/threads" icon={Hash}>Threads</NavLink>
         </div>
 
         <button
@@ -83,22 +85,34 @@ function App() {
   }
 
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<ChatPage token={token} />} />
-        <Route path="/admin" element={<AdminPage />} />
-        <Route
-          path="/visualizer"
-          element={
-            <Suspense fallback={<div className="flex items-center justify-center h-full">Loading…</div>}>
-              <VisualizerPage />
-            </Suspense>
-          }
-        />
-        {/* Redirect unknown routes to chat */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AppLayout>
+    <Routes>
+      {/* Standalone Route for Threads (Custom Layout) */}
+      <Route path="/threads" element={<ThreadsPage />} />
+      <Route path="/threads/:id" element={<ThreadsPage />} />
+
+      {/* Main App Routes with Top Navigation */}
+      <Route
+        path="/*"
+        element={
+          <AppLayout>
+            <Routes>
+              <Route path="/" element={<ChatPage token={token} />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route
+                path="/visualizer"
+                element={
+                  <Suspense fallback={<div className="flex items-center justify-center h-full">Loading…</div>}>
+                    <VisualizerPage />
+                  </Suspense>
+                }
+              />
+              {/* Redirect unknown routes to chat */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </AppLayout>
+        }
+      />
+    </Routes>
   );
 }
 

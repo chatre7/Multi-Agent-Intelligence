@@ -112,7 +112,7 @@ class ConversationGraphBuilder:
         if workflow_type == "supervisor" and "workflow_type" in domain.metadata:
              workflow_type = domain.metadata["workflow_type"]
         
-        if workflow_type in ["orchestrator", "few_shot", "hybrid"]:
+        if workflow_type in ["orchestrator", "few_shot", "hybrid", "social_simulation"]:
             # Use new workflow strategy system
             from src.infrastructure.langgraph.workflow_strategies import get_workflow_strategy
             
@@ -131,8 +131,16 @@ class ConversationGraphBuilder:
                 
                 # Get token callback from config if present
                 token_callback = None
+                enable_thinking = False
                 if config and "configurable" in config:
                     token_callback = config["configurable"].get("token_callback")
+                    enable_thinking = config["configurable"].get("enable_thinking", False)
+                
+                # Also check for system messages with thinking instructions
+                for msg in messages:
+                    if msg.get("role") == "system" and "<think>" in msg.get("content", ""):
+                        enable_thinking = True
+                        break
                 
                 # Get last user message as the request
                 last_user_message = next(
@@ -146,7 +154,8 @@ class ConversationGraphBuilder:
                         domain=domain,
                         agents=agents_by_id,
                         user_request=last_user_message,
-                        token_callback=token_callback
+                        token_callback=token_callback,
+                        enable_thinking=enable_thinking
                     )
                     
                     # Convert WorkflowResult to conversation messages and thoughts
@@ -154,13 +163,25 @@ class ConversationGraphBuilder:
                     new_thoughts = state.get("thoughts", [])
 
                     for step in result.steps:
+                        # Collect thoughts from all agents (worker + router)
+                        step_thoughts = step.metadata.get("thoughts", [])
+                        for st in step_thoughts:
+                            new_thoughts.append({
+                                "agent_id": step.agent_id,
+                                "agent_name": agents_by_id.get(step.agent_id).name if agents_by_id.get(step.agent_id) else step.agent_id,
+                                "thought": st.get("content", ""),
+                                "type": st.get("type", "reasoning"),
+                                "metadata": st # Keep original structure
+                            })
+
                         if step.agent_id == "router":
-                            # It's a thought/decision
+                            # It's a dedicated thought/decision step
                             new_thoughts.append({
                                 "agent_id": "router",
+                                "agent_name": "Router",
                                 "thought": step.metadata.get("thought", ""),
                                 "decision": step.metadata.get("decision", {}),
-                                "timestamp": None # Could add timestamp
+                                "type": "routing"
                             })
                         else:
                             # It's a message
@@ -232,6 +253,19 @@ class ConversationGraphBuilder:
             def run_agent(state: ConversationState) -> ConversationState:
                 messages = list(state.get("messages", []))
                 
+                # Load skills for this agent (Must be done before get_effective_tools)
+                all_skills = {}
+                if self.skill_loader:
+                    for skill_id in agent.skills:
+                        skill = self.skill_loader.load_skill(skill_id)
+                        if skill:
+                            all_skills[skill.id] = skill
+                
+                if self.skill_repo:
+                    db_skills = self.skill_repo.get_agent_skills(agent.id)
+                    for s in db_skills:
+                        all_skills[s.id] = s
+
                 # Get effective tools (including skill-provided tools)
                 effective_tools_ids = get_effective_tools(agent, list(all_skills.values()))
                 tools = registry.get_tools_for_agent(effective_tools_ids)
@@ -257,18 +291,6 @@ class ConversationGraphBuilder:
                         print(f"[DEBUG] Memory search failed: {e}")
 
                 # 2. Format system prompt with Agent instructions + Tool instructions + Memory
-                # Load skills for this agent
-                all_skills = {}
-                if self.skill_loader:
-                    for skill_id in agent.skills:
-                        skill = self.skill_loader.load_skill(skill_id)
-                        if skill:
-                            all_skills[skill.id] = skill
-                
-                if self.skill_repo:
-                    db_skills = self.skill_repo.get_agent_skills(agent.id)
-                    for s in db_skills:
-                        all_skills[s.id] = s
             
                 # Get effective system prompt (includes skill instructions)
                 base_system_prompt = get_effective_system_prompt(agent, list(all_skills.values()))
@@ -282,10 +304,14 @@ class ConversationGraphBuilder:
                 # Create LLM adapter
                 llm = llm_from_env()
                 
-                # Format messages
+                # Format messages - extract system messages to prepend to system prompt
                 llm_messages = []
+                extra_system_instructions = []
                 for m in messages:
-                    if m["role"] == "tool":
+                    if m["role"] == "system":
+                        # Collect system messages to add to system prompt
+                        extra_system_instructions.append(m["content"])
+                    elif m["role"] == "tool":
                         # Map tool output to user role with clear prefix for LLM compatibility
                         llm_messages.append({"role": "user", "content": f"[TOOL OBSERVATION] {m['content']}"})
                     else:
@@ -293,8 +319,11 @@ class ConversationGraphBuilder:
                 
                 # Get model and prompt
                 model = agent.model_name or "llama3.2"
-                # Reinforce tool calling instructions at the end of system prompt
-                system_prompt = f"{base_system_prompt}\n{tool_prompt}"
+                # Build final system prompt: base + extra instructions + tools
+                system_prompt = base_system_prompt
+                if extra_system_instructions:
+                    system_prompt = "\n\n".join([system_prompt] + extra_system_instructions)
+                system_prompt = f"{system_prompt}\n{tool_prompt}"
                 
                 print(f"[DEBUG] Invoking LLM: {model}")
                 print(f"[DEBUG] System Prompt Length: {len(system_prompt)}")
@@ -391,7 +420,19 @@ class ConversationGraphBuilder:
                 
                 # Check if any tool call is actually a handoff
                 actual_tool_calls = []
+                
+                # Map Tools to Skills for Observability
+                tool_to_skill_map = {}
+                for skill in all_skills.values():
+                    for tool_id in skill.tools:
+                        tool_to_skill_map[tool_id] = skill.name
+
                 for tc in tool_calls:
+                    # Inject Skill Metadata
+                    if tc["tool"] in tool_to_skill_map:
+                        tc["metadata"] = {"skill_id": tool_to_skill_map[tc["tool"]]}
+                        print(f"[DEBUG] Tool '{tc['tool']}' linked to Skill '{tool_to_skill_map[tc['tool']]}'")
+
                     if tc["tool"] == "transfer_to_agent":
                         target = tc["params"].get("target_agent")
                         reason = tc["params"].get("reason", "No reason")
@@ -443,13 +484,16 @@ class ConversationGraphBuilder:
             for call in tool_calls:
                 tool_id = call["tool"]
                 params = call["params"]
+                metadata = call.get("metadata", {})
+                
                 try:
                     result = registry.execute(tool_id, params)
                     output = f"Tool '{tool_id}' output: {result}"
                 except Exception as e:
                     output = f"Tool '{tool_id}' error: {str(e)}"
                 
-                messages.append({"role": "tool", "content": output})
+                # Propagate metadata (skill_id) to the tool output message
+                messages.append({"role": "tool", "content": output, "metadata": metadata})
             
             # Clear pending tools
             return {**state, "messages": messages, "pending_tool_calls": []}

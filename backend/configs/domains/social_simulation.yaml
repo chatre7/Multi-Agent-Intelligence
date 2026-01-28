@@ -1,0 +1,12 @@
+id: social_simulation
+name: AI Social Threads
+description: Autonomous social network simulation where agents post and reply to each other.
+workflow_type: social_simulation
+default_agent: storyteller
+agents:
+  - storyteller
+  - comedian
+  - philosopher
+metadata:
+  social_simulation:
+    max_turns: 5

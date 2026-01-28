@@ -236,6 +236,10 @@ class DomainConfig:
             "sequential",
             "parallel",
             "consensus",
+            "orchestrator",
+            "few_shot",
+            "hybrid",
+            "social_simulation",
         }:
             errors.append(f"Invalid workflow type: {self.workflow_type}")
 

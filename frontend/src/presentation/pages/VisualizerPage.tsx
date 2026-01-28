@@ -123,7 +123,7 @@ export function VisualizerPage() {
             {
                 type: 'workflow_step_start',
                 handler: (data: unknown) => {
-                    const msg = data as { payload: { agentId: string; agentName: string; conversationId: string } };
+                    const msg = data as { payload: { agentId: string; agentName: string; conversationId: string; content?: string; metadata?: any; timestamp?: number } };
                     const payload = msg.payload;
                     if (!payload || selectedConversation?.id !== payload.conversationId) return;
 
@@ -132,6 +132,20 @@ export function VisualizerPage() {
                         ...a,
                         status: a.id === payload.agentId ? 'active' : a.status,
                     })));
+
+                    // If content is present, add to event log (e.g. Tool Start)
+                    if (payload.content) {
+                        setEventLog(prev => [{
+                            id: `evt-${Date.now()}-${Math.random()}`,
+                            type: 'step_start',
+                            timestamp: new Date(payload.timestamp ? payload.timestamp * 1000 : Date.now()).toISOString(),
+                            agentId: payload.agentId,
+                            agentName: payload.agentName,
+                            conversationId: payload.conversationId,
+                            content: payload.content,
+                            metadata: payload.metadata || {}
+                        }, ...prev]);
+                    }
                 },
             },
             {
@@ -156,7 +170,7 @@ export function VisualizerPage() {
             {
                 type: 'workflow_handoff',
                 handler: (data: unknown) => {
-                    const msg = data as { payload: { fromAgentId: string; toAgentId: string; fromAgent: string; toAgent: string; reason?: string; conversationId: string } };
+                    const msg = data as { payload: { fromAgentId: string; toAgentId: string; fromAgent: string; toAgent: string; reason?: string; conversationId: string; timestamp?: number } };
                     const payload = msg.payload;
                     if (!payload || selectedConversation?.id !== payload.conversationId) return;
 
@@ -172,6 +186,20 @@ export function VisualizerPage() {
                             label: payload.reason,
                         }];
                     });
+
+                    // Add to event log
+                    setEventLog(prev => [{
+                        id: `evt-handoff-${Date.now()}`,
+                        type: 'handoff',
+                        timestamp: new Date(payload.timestamp ? payload.timestamp * 1000 : Date.now()).toISOString(),
+                        agentId: payload.fromAgentId,
+                        agentName: payload.fromAgent,
+                        conversationId: payload.conversationId,
+                        metadata: {
+                            toAgent: payload.toAgent,
+                            reason: payload.reason
+                        }
+                    }, ...prev]);
                 },
             },
             {
@@ -181,6 +209,17 @@ export function VisualizerPage() {
                     const msg = data as { payload: { agentId: string; agentName: string; conversationId: string; reason: string } };
                     const payload = msg.payload;
                     if (!payload || selectedConversation?.id !== payload.conversationId) return;
+
+                    setEventLog(prev => [{
+                        id: `evt-thought-${Date.now()}-${Math.random()}`,
+                        type: 'thought' as any,
+                        timestamp: new Date().toISOString(),
+                        agentId: payload.agentId,
+                        agentName: payload.agentName,
+                        conversationId: payload.conversationId,
+                        content: payload.reason,
+                        metadata: {}
+                    }, ...prev]);
                 },
             },
             {
@@ -372,7 +411,13 @@ export function VisualizerPage() {
                     agentName: l.agentName,
                     conversationId: conversationId,
                     content: l.content,
-                    metadata: l.metadata || {}
+                    metadata: {
+                        ...l.metadata,
+                        // Normalize snake_case for frontend
+                        toAgent: l.metadata?.toAgent || l.metadata?.to_agent,
+                        fromAgent: l.metadata?.fromAgent || l.metadata?.from_agent,
+                        skillId: l.metadata?.skillId || l.metadata?.skill_id
+                    }
                 }));
                 // Sort by timestamp descending
                 setEventLog(mapped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));

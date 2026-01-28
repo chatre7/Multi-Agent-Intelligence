@@ -41,6 +41,7 @@ class SendMessageRequest:
     role: str = "user"
     conversation_id: str | None = None
     subject: str = ""
+    enable_thinking: bool = False
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,7 @@ class SendMessageStreamEvent:
     text: str | None = None
     response: SendMessageResponse | None = None
     agent_id: str | None = None
+    metadata: dict | None = None
 
 
 @dataclass
@@ -188,17 +190,21 @@ class SendMessageUseCase:
             ]
 
         if self.conversation_repo is not None:
-             # Only add if not already in graph messages? 
-             # For now, just ensure we save what we return.
-            self.conversation_repo.add_message(
-                Message(
-                    id=str(uuid4()),
-                    conversation_id=conversation_id,
-                    role="assistant",
-                    content=reply_text,
-                    metadata={"agent_id": str(agent_id)},
-                )
-            )
+            # Sync all assistant messages that might have come from the graph
+            existing_messages = self.conversation_repo.list_messages(conversation_id)
+            existing_contents = {m.content for m in existing_messages if m.role == "assistant"}
+            
+            for msg in messages:
+                if msg["role"] == "assistant" and msg["content"] not in existing_contents:
+                    self.conversation_repo.add_message(
+                        Message(
+                            id=str(uuid4()),
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=msg["content"],
+                            metadata={"agent_id": str(agent_id)},
+                        )
+                    )
         return SendMessageResponse(
             domain_id=request.domain_id,
             agent_id=str(agent_id or domain.default_agent),
@@ -251,9 +257,25 @@ class SendMessageUseCase:
             )
 
         graph = self.graph_builder.build(domain, bundle.agents)
+        
+        # Build initial messages with optional thinking instruction
+        user_message = {"role": "user", "content": request.message}
+        initial_messages = [user_message]
+        
+        # When thinking mode enabled, prepend a system instruction
+        if request.enable_thinking:
+            thinking_instruction = {
+                "role": "system",
+                "content": (
+                    "Before responding, wrap your internal reasoning inside <think>...</think> tags. "
+                    "Show your thought process step by step. After the </think> tag, provide your final answer."
+                )
+            }
+            initial_messages = [thinking_instruction, user_message]
+        
         initial_state: ConversationState = {
             "domain_id": request.domain_id,
-            "messages": [{"role": "user", "content": request.message}],
+            "messages": initial_messages,
         }
 
         selected_agent: str | None = None
@@ -261,7 +283,10 @@ class SendMessageUseCase:
         started = datetime.now(UTC)
 
         processed_thoughts_count = 0 
+        accumulated_thoughts = []
         reply_text = ""
+        is_thinking = False
+        thought_buffer = ""
         
         # Async Queue for non-blocking consumption
         loop = asyncio.get_running_loop()
@@ -298,8 +323,54 @@ class SendMessageUseCase:
                 
             if item["type"] == "token":
                 chunk = item["content"]
-                reply_text += chunk
-                yield SendMessageStreamEvent(type="delta", text=chunk)
+                
+                # REFINED STATE MACHINE FOR <THINK> TAGS
+                # Current state variables defined above: is_thinking (bool), thought_buffer (str)
+                
+                # Check for tag transitions
+                # Note: This handles potential split-across-chunks by checking the combined text
+                # but for high-speed streaming, we check if the chunk contains the tags.
+                
+                if "<think>" in chunk:
+                    parts = chunk.split("<think>", 1)
+                    # Content before <think> is normal
+                    if parts[0]:
+                        yield SendMessageStreamEvent(type="delta", text=parts[0])
+                        reply_text += parts[0]
+                    
+                    is_thinking = True
+                    chunk = parts[1] # Process remainder as thinking
+                
+                if is_thinking:
+                    if "</think>" in chunk:
+                        parts = chunk.split("</think>", 1)
+                        # Content before </think> is thinking
+                        if parts[0]:
+                            thought_buffer += parts[0]
+                            yield SendMessageStreamEvent(type="thought", text=parts[0])
+                        
+                        # Finish this thinking block
+                        accumulated_thoughts.append({
+                            "content": thought_buffer,
+                            "agentName": selected_agent or "Assistant",
+                            "timestamp": datetime.now(UTC).isoformat()
+                        })
+                        thought_buffer = ""
+                        is_thinking = False
+                        
+                        # Remainder is normal content
+                        if parts[1]:
+                            yield SendMessageStreamEvent(type="delta", text=parts[1])
+                            reply_text += parts[1]
+                    else:
+                        # Pure thinking
+                        thought_buffer += chunk
+                        yield SendMessageStreamEvent(type="thought", text=chunk)
+                else:
+                    # Pure normal content
+                    reply_text += chunk
+                    yield SendMessageStreamEvent(type="delta", text=chunk)
+                
                 continue
                 
             state = item["content"]
@@ -321,28 +392,97 @@ class SendMessageUseCase:
                     type="agent_selected", agent_id=selected_agent
                 )
             
-            # Check for new thoughts
+            # Check for thoughts
             thoughts = state.get("thoughts", [])
             if len(thoughts) > processed_thoughts_count:
                 new_thoughts = thoughts[processed_thoughts_count:]
                 for t in new_thoughts:
+                    # Log thought to DB
+                    thought_text = t.get("thought", "")
+                    
+                    # Accumulate for persistence
+                    accumulated_thoughts.append({
+                        "content": thought_text,
+                        "agentName": selected_agent or "Router",
+                        "timestamp": datetime.now(UTC).isoformat()
+                    })
+
+                    # DETECT SKILL USAGE IN THOUGHTS (CoT Tagging)
+                    # Pattern: [USING SKILL: skill_id]
+                    import re
+                    skill_match = re.search(r"\[USING SKILL:\s*(.*?)\]", thought_text, re.IGNORECASE)
+                    if skill_match:
+                        skill_id = skill_match.group(1).strip()
+                        # Emit a 'tool_start' event so the frontend renders the Badge
+                        # behave as if it's a tool for observability purposes
+                        if self.workflow_log_repo:
+                            self.workflow_log_repo.save(WorkflowLog(
+                                id=str(uuid4()),
+                                conversation_id=conversation_id,
+                                agent_id=selected_agent or domain.default_agent,
+                                agent_name=selected_agent or domain.default_agent,
+                                event_type="tool_start", # Reuse existing type for badge
+                                content=f"Using skill: {skill_id}",
+                                metadata={"skill_id": skill_id, "source": "thought_tag"},
+                                created_at=datetime.now(UTC)
+                            ))
+                        
+                        yield SendMessageStreamEvent(
+                            type="tool_start",
+                            text=f"Applying {skill_id}",
+                            agent_id=selected_agent,
+                            metadata={"skill_id": skill_id}
+                        )
+
                     if self.workflow_log_repo:
                         self.workflow_log_repo.save(WorkflowLog(
                             id=str(uuid4()),
                             conversation_id=conversation_id,
-                            agent_id="router",
-                            agent_name="Router",
+                            agent_id=selected_agent or 'router',
+                            agent_name='Router' if not selected_agent else selected_agent,
                             event_type="thought",
-                            content=t.get("thought", ""),
-                            metadata=t,
+                            content=thought_text,
+                            metadata={"reason": thought_text},
                             created_at=datetime.now(UTC)
                         ))
+                    
                     yield SendMessageStreamEvent(
                         type="thought",
-                        text=t.get("thought", ""),
-                        agent_id="router"
+                        text=thought_text,
+                        agent_id=selected_agent or "router"
                     )
                 processed_thoughts_count = len(thoughts)
+            
+            # Check for tool calls (Skill Usage)
+            pending_tools = state.get("pending_tool_calls", [])
+            if pending_tools:
+                for tool in pending_tools:
+                    # Avoid duplicates if possible, though stream might re-emit.
+                    # Simple de-dupe strategy: check if we already yielded for this thought/step?
+                    # For now, relying on unique ID would be better, but we don't track yielded tool/call IDs.
+                    # MVP: Emit. Handler should handle or UI will show multiple.
+                    # Refinement: We can track yielded_tool_call_ids if needed.
+                    
+                    # Log to DB
+                    meta = tool.get("metadata", {})
+                    if self.workflow_log_repo:
+                         self.workflow_log_repo.save(WorkflowLog(
+                            id=str(uuid4()),
+                            conversation_id=conversation_id,
+                            agent_id=selected_agent or domain.default_agent,
+                            agent_name=selected_agent or domain.default_agent,
+                            event_type="tool_start",
+                            content=f"Using tool: {tool['tool']}",
+                            metadata={**meta, "tool": tool["tool"], "params": tool["params"]},
+                            created_at=datetime.now(UTC)
+                        ))
+                    
+                    yield SendMessageStreamEvent(
+                        type="tool_start",
+                        text=f"Executing {tool['tool']}",
+                        agent_id=selected_agent,
+                        metadata=meta
+                    )
 
         final_state = last_state or initial_state
         
@@ -415,16 +555,25 @@ class SendMessageUseCase:
             messages.append({"role": "assistant", "content": reply_text})
 
         if self.conversation_repo is not None:
-            await self._run_sync(
-                self.conversation_repo.add_message,
-                Message(
-                    id=str(uuid4()),
-                    conversation_id=conversation_id,
-                    role="assistant",
-                    content=reply_text,
-                    metadata={"agent_id": str(final_agent_id)},
-                )
-            )
+            # Sync all assistant messages from graph state
+            existing_messages = await self._run_sync(self.conversation_repo.list_messages, conversation_id)
+            existing_contents = {m.content for m in existing_messages if m.role == "assistant"}
+
+            for msg in messages:
+                if msg["role"] == "assistant" and msg["content"] not in existing_contents:
+                    await self._run_sync(
+                        self.conversation_repo.add_message,
+                        Message(
+                            id=str(uuid4()),
+                            conversation_id=conversation_id,
+                            role="assistant",
+                            content=msg["content"],
+                            metadata={
+                                "agent_id": str(final_agent_id),
+                                "thoughts": accumulated_thoughts if msg["content"] == reply_text else []
+                            },
+                        )
+                    )
 
         duration_ms = int((datetime.now(UTC) - started).total_seconds() * 1000)
         _ = duration_ms  # reserved for future metrics / metadata

@@ -315,6 +315,9 @@ def register_websocket_routes(
                     content = str(
                         (payload.get("payload") or {}).get("content", "")
                     ).strip()
+                    enable_thinking = bool(
+                        (payload.get("payload") or {}).get("enableThinking", False)
+                    )
                     if not conversation_id or not content:
                         await ws_error(
                             "conversationId and payload.content are required",
@@ -494,6 +497,7 @@ def register_websocket_routes(
                         conversation_id=conversation_id_local,
                         task_key=task_key_local,
                         message_id=message_id_local,
+                        enable_thinking=enable_thinking,
                     ) -> None:
                         started_at = asyncio.get_event_loop().time()
                         chunks: list[str] = []
@@ -506,6 +510,7 @@ def register_websocket_routes(
                                     role=role,
                                     conversation_id=conversation_id,
                                     subject=subject,
+                                    enable_thinking=enable_thinking,
                                 )
                             ):
                                 if event.type == "agent_selected" and event.agent_id:
@@ -546,13 +551,42 @@ def register_websocket_routes(
                                             "timestamp": asyncio.get_event_loop().time(),
                                         },
                                     })
+                                if event.type == "tool_start":
+                                    # Ensure agent_name is up to date
+                                    if event.agent_id:
+                                         if not agent_name:
+                                             bundle = chat_use_case.loader.load_bundle()
+                                             agent = bundle.agents.get(event.agent_id)
+                                             agent_name = agent.name if agent else event.agent_id
+                                    
+                                    await ws_send({
+                                        "type": "workflow_step_start",
+                                        "conversationId": conversation_id,
+                                        "payload": {
+                                            "agentId": event.agent_id or "router",
+                                            "agentName": agent_name or "System",
+                                            "timestamp": asyncio.get_event_loop().time(),
+                                            "content": event.text, # "Executing [Tool]"
+                                            "metadata": event.metadata or {} # Includes skill_id
+                                        },
+                                    })
                                 if event.type == "thought":
+                                    # Ensure agent_name is up to date
+                                    current_agent_name = "Router"
+                                    if event.agent_id and event.agent_id != "router":
+                                         if not agent_name or agent_name == "Router":
+                                             bundle = chat_use_case.loader.load_bundle()
+                                             agent = bundle.agents.get(event.agent_id)
+                                             current_agent_name = agent.name if agent else event.agent_id
+                                         else:
+                                             current_agent_name = agent_name
+                                    
                                     await ws_send({
                                         "type": "workflow_thought",
                                         "conversationId": conversation_id,
                                         "payload": {
                                             "agentId": event.agent_id or "router",
-                                            "agentName": "Router",
+                                            "agentName": current_agent_name,
                                             "conversationId": conversation_id,
                                             "reason": event.text or "Thinking..."
                                         }

@@ -2,9 +2,9 @@
  * Individual chat message component - Enhanced with Thoughts & Markdown
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Message } from "../../../domain/entities/types";
-import { User, Bot, Code2, Bug, Search, FileText, CheckCircle, Shield, ChevronDown, ChevronRight, BrainCircuit } from "lucide-react";
+import { User, Bot, Code2, Bug, Search, FileText, CheckCircle, Shield, ChevronRight, BrainCircuit, Zap, BookOpen, Scroll, Laugh, Heart, Share2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -71,6 +71,51 @@ const agentMetadata: Record<string, {
     bubbleBorder: "border-indigo-200",
     bubbleText: "text-indigo-900",
     badgeBg: "bg-indigo-600"
+  },
+  storyteller: {
+    name: "Storyteller",
+    icon: BookOpen,
+    avatarBg: "from-amber-400 to-orange-500",
+    bubbleBg: "from-amber-50/50 to-orange-50/50",
+    bubbleBorder: "border-amber-200",
+    bubbleText: "text-amber-900",
+    badgeBg: "bg-amber-600"
+  },
+  philosopher: {
+    name: "Philosopher",
+    icon: Scroll,
+    avatarBg: "from-blue-600 to-indigo-700",
+    bubbleBg: "from-blue-50/50 to-indigo-50/50",
+    bubbleBorder: "border-blue-200",
+    bubbleText: "text-blue-900",
+    badgeBg: "bg-blue-600"
+  },
+  comedian: {
+    name: "Comedian",
+    icon: Laugh,
+    avatarBg: "from-pink-500 to-rose-600",
+    bubbleBg: "from-pink-50/50 to-rose-50/50",
+    bubbleBorder: "border-pink-200",
+    bubbleText: "text-pink-900",
+    badgeBg: "bg-pink-600"
+  },
+  empath: {
+    name: "Empath",
+    icon: Heart,
+    avatarBg: "from-emerald-400 to-teal-500",
+    bubbleBg: "from-emerald-50/50 to-teal-50/50",
+    bubbleBorder: "border-emerald-200",
+    bubbleText: "text-emerald-900",
+    badgeBg: "bg-emerald-600"
+  },
+  router: {
+    name: "System Router",
+    icon: Share2,
+    avatarBg: "from-slate-600 to-gray-700",
+    bubbleBg: "from-slate-50 to-gray-50",
+    bubbleBorder: "border-slate-300",
+    bubbleText: "text-slate-900",
+    badgeBg: "bg-slate-700"
   }
 };
 
@@ -95,13 +140,16 @@ export default function ChatMessage({ message, isLast, isStreaming }: ChatMessag
 
   const IconComponent = metadata.icon;
   const [thoughtsOpen, setThoughtsOpen] = useState(false);
+  const [hasAutoExpanded, setHasAutoExpanded] = useState(false);
 
-  // Auto-expand thoughts if streaming and thoughts exist
-  // useEffect(() => {
-  //   if (isStreaming && message.thoughts && message.thoughts.length > 0) {
-  //     setThoughtsOpen(true);
-  //   }
-  // }, [isStreaming, message.thoughts?.length]);
+  // Auto-expand thoughts if streaming and thoughts exist (only once)
+  // This satisfies the user request "ค้างไว้ก่อนได้ไหม" (keep it open)
+  useEffect(() => {
+    if (isStreaming && !hasAutoExpanded && ((message.thoughts?.length ?? 0) > 0 || (message.metadata?.thoughts?.length ?? 0) > 0)) {
+      setThoughtsOpen(true);
+      setHasAutoExpanded(true);
+    }
+  }, [isStreaming, hasAutoExpanded, message.thoughts?.length, message.metadata?.thoughts?.length]);
 
   if (message.role === "system" && message.metadata?.isHandoff) {
     const fromAgent = message.metadata.fromAgent || "Unknown";
@@ -129,9 +177,9 @@ export default function ChatMessage({ message, isLast, isStreaming }: ChatMessag
           <div className={`flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br ${isUser ? "from-blue-600 to-blue-700" : metadata.avatarBg
             } flex items-center justify-center shadow-lg ring-2 ring-white`}>
             {isUser ? (
-              <User size={20} className="text-white" strokeWidth={2.5} />
+              <User size={20} className="text-white" strokeWidth={2.5} aria-hidden="true" />
             ) : (
-              <IconComponent size={20} className="text-white" strokeWidth={2.5} />
+              <IconComponent size={20} className="text-white" strokeWidth={2.5} aria-hidden="true" />
             )}
           </div>
 
@@ -147,63 +195,107 @@ export default function ChatMessage({ message, isLast, isStreaming }: ChatMessag
                   {message.agent_id}
                 </span>
               )}
+              {message.metadata?.skill_id && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 shadow-sm" title="Skill Used">
+                  <Zap size={10} className="fill-amber-500 text-amber-600" />
+                  {message.metadata.skill_id}
+                </span>
+              )}
             </div>
 
-            {/* Thoughts Accordion */}
-            {message.thoughts && message.thoughts.length > 0 && (
-              <div className="w-full mb-2">
-                <button
-                  onClick={() => setThoughtsOpen(!thoughtsOpen)}
-                  className="flex items-center gap-2 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors mb-1 select-none"
-                >
-                  {thoughtsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                  <BrainCircuit size={14} />
-                  <span>Thought Process ({message.thoughts.length} steps)</span>
-                </button>
+            {/* Message Bubble */}
+            <div className={`rounded-2xl px-5 py-3.5 shadow-sm w-full relative overflow-hidden transition-[background-color,border-color,box-shadow,opacity] duration-300 border ${isUser
+              ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-blue-500/10 border-blue-500/20"
+              : `bg-gradient-to-br ${metadata.bubbleBg} ${metadata.bubbleBorder} ${metadata.bubbleText} shadow-gray-200/40 backdrop-blur-[2px]`
+              }`}>
 
-                {thoughtsOpen && (
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 text-xs text-gray-600 space-y-2 animate-in slide-in-from-top-2 duration-200">
-                    {message.thoughts.map((thought, idx) => (
-                      <div key={idx} className="border-l-2 border-gray-300 pl-2">
-                        <span className="font-semibold text-gray-700 mr-1">{thought.agentName}:</span>
-                        {thought.content}
-                      </div>
-                    ))}
-                    {isStreaming && isLast && (
-                      <div className="flex gap-1 items-center px-1 h-4">
-                        <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                        <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                        <span className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></span>
-                      </div>
+              {/* Integrated Thoughts (Deep Research Style) */}
+              {!isUser && (message.thoughts?.length || (message.metadata?.thoughts?.length) || isStreaming) && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setThoughtsOpen(!thoughtsOpen);
+                      }}
+                      aria-expanded={thoughtsOpen}
+                      aria-label={thoughtsOpen ? "Collapse thinking process" : "Expand thinking process"}
+                      className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider transition-colors duration-200 py-1 px-2 rounded-md ${thoughtsOpen
+                        ? "bg-black/5 dark:bg-white/5 opacity-80"
+                        : "hover:bg-black/5 dark:hover:bg-white/5 opacity-60 hover:opacity-90"
+                        }`}
+                    >
+                      <BrainCircuit aria-hidden="true" size={12} className={isStreaming ? "animate-pulse text-purple-600" : ""} />
+                      <span>Thinking Process</span>
+                      <ChevronRight aria-hidden="true" size={12} className={`transition-transform duration-300 ${thoughtsOpen ? "rotate-90" : "rotate-0"}`} />
+                    </button>
+
+                    {isStreaming ? (
+                      <span className="flex items-center gap-1.5 animate-in fade-in duration-500">
+                        <span className="w-1 h-1 bg-current rounded-full animate-ping"></span>
+                        <span className="text-[10px] font-medium italic opacity-70">Reasoning…</span>
+                      </span>
+                    ) : ((message.thoughts?.length ?? 0) > 0 || (message.metadata?.thoughts?.length ?? 0) > 0) && (
+                      <span className="flex items-center gap-1 text-[10px] font-bold opacity-60">
+                        <CheckCircle aria-hidden="true" size={10} className="text-emerald-600" />
+                        <span>Reasoned</span>
+                      </span>
                     )}
                   </div>
-                )}
-              </div>
-            )}
 
-            {/* Message Bubble */}
-            <div className={`rounded-2xl px-4 py-3 shadow-sm w-full ${isUser
-              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white"
-              : `bg-gradient-to-br ${metadata.bubbleBg} border ${metadata.bubbleBorder} ${metadata.bubbleText}`
-              }`}>
-              <div className={`text-sm leading-relaxed prose max-w-none break-words ${isUser ? "prose-invert" : ""}`}>
+                  {thoughtsOpen && (
+                    <div className="bg-black/5 dark:bg-white/5 rounded-xl p-3.5 mb-3 border border-black/5 dark:border-white/5 text-[13px] leading-relaxed opacity-90 space-y-3 animate-in fade-in slide-in-from-top-1 duration-300">
+                      {(message.thoughts || message.metadata?.thoughts || []).map((thought: any, idx: number) => (
+                        <div key={idx} className="relative pl-3 border-l-2 border-current/20 last:mb-0">
+                          <div className="whitespace-pre-wrap font-serif italic text-pretty">
+                            {thought.content}
+                          </div>
+                        </div>
+                      ))}
+                      {isStreaming && (
+                        <div className="flex gap-1.5 items-center px-1">
+                          <span className="w-1 h-1 bg-current opacity-40 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                          <span className="w-1 h-1 bg-current opacity-40 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                          <span className="w-1 h-1 bg-current opacity-40 rounded-full animate-bounce"></span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {message.content && <div className="h-px bg-current opacity-10 w-full mb-4" />}
+                </div>
+              )}
+
+              <div className={`text-sm leading-relaxed prose max-w-none [overflow-wrap:anywhere] [word-break:break-word] text-pretty ${isUser ? "prose-invert" : ""}`}>
                 {(!message.content && !isUser && (!message.thoughts || message.thoughts.length === 0)) ? (
                   // Loading dots if truly empty and no thoughts
-                  <div className="flex gap-1 items-center h-5 px-1">
+                  <div className="flex gap-1 items-center h-5 px-1 py-4">
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                     <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
                   </div>
                 ) : (
-                  <div className={isStreaming && isLast ? "cursor-blink" : ""}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <div className={`${isStreaming && isLast ? "cursor-blink" : ""} overflow-x-auto`}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        // Ensure images and tables don't break layout
+                        img: ({ node, ...props }) => <img {...props} className="max-w-full rounded-lg shadow-sm my-2" />,
+                        table: ({ node, ...props }) => <div className="overflow-x-auto my-4"><table {...props} className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg text-xs" /></div>,
+                        pre: ({ node, ...props }) => <pre {...props} className="bg-gray-900 text-gray-100 p-4 rounded-xl overflow-x-auto my-3 text-xs shadow-inner border border-gray-800" />,
+                        code: ({ node, ...props }: any) =>
+                          props.inline
+                            ? <code {...props} className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-pink-600 font-mono text-[0.9em]" />
+                            : <code {...props} />
+                      }}
+                    >
                       {message.content || ""}
                     </ReactMarkdown>
                   </div>
                 )}
               </div>
 
-              <time className={`text-[10px] mt-2 block ${isUser ? "text-right text-blue-100" : "text-left text-gray-500 opacity-70"}`}>
+              <time className={`text-[10px] mt-2 block font-variant-numeric-tabular-nums ${isUser ? "text-right text-blue-100" : "text-left text-gray-500 opacity-70"}`}>
                 {new Date(message.timestamp).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit'

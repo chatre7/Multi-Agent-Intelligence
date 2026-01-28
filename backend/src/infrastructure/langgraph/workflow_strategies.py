@@ -33,6 +33,44 @@ from src.infrastructure.config.skill_loader import SkillLoader
 from src.application.use_cases.skills import get_effective_system_prompt
 from pathlib import Path
 
+def extract_thoughts(text: str) -> tuple[str, list[dict[str, Any]]]:
+    """
+    Extract reasoning from LLM response.
+    Supports <think>...</think> blocks and [USING SKILL: ...] tags.
+    Returns (clean_text, thoughts_list).
+    """
+    thoughts = []
+    clean_text = text
+    
+    # 1. Extract <think> blocks
+    think_pattern = r"<think>(.*?)</think>"
+    think_matches = re.finditer(think_pattern, text, re.DOTALL)
+    
+    for match in think_matches:
+        thought_content = match.group(1).strip()
+        if thought_content:
+            thoughts.append({
+                "content": thought_content,
+                "type": "reasoning"
+            })
+    
+    # Remove <think> blocks from clean text
+    clean_text = re.sub(think_pattern, "", clean_text, flags=re.DOTALL).strip()
+    
+    # 2. Extract CoT tags [USING SKILL: ...]
+    skill_pattern = r"\[USING SKILL:\s*(.*?)\]"
+    skill_matches = re.finditer(skill_pattern, clean_text, re.IGNORECASE)
+    
+    for match in skill_matches:
+        skill_id = match.group(1).strip()
+        thoughts.append({
+            "content": f"Applying skill: {skill_id}",
+            "type": "skill_usage",
+            "skill_id": skill_id
+        })
+        
+    return clean_text, thoughts
+
 
 @dataclass
 class WorkflowStep:
@@ -146,19 +184,26 @@ class OrchestratorStrategy(WorkflowStrategy):
             # Execute agent with retry and validation
             # Pass full validation context logic here if needed
             print(f"[INFO] Orchestrator: Executing agent '{agent_id}'")
-            result = self._execute_agent_with_retry(agent, current_context, token_callback=token_callback)
+            raw_result = self._execute_agent_with_retry(agent, current_context, token_callback=token_callback)
+
+            # Extract thoughts
+            clean_result, extracted_thoughts = extract_thoughts(raw_result)
 
             # Record this step
             steps.append(
                 WorkflowStep(
                     agent_id=agent_id,
                     task=current_context,
-                    metadata={"result": result},
+                    metadata={
+                        "result": clean_result,
+                        "raw_result": raw_result,
+                        "thoughts": extracted_thoughts
+                    },
                 )
             )
 
-            # Build context for next agent
-            current_context = f"{current_context}\n\nPrevious output from {agent_id}:\n{result}"
+            # Build context for next agent (use raw result to keep CoT for subsequent agents if they need it)
+            current_context = f"{current_context}\n\nPrevious output from {agent_id}:\n{raw_result}"
 
         # Return final result
         return WorkflowResult(
@@ -315,7 +360,9 @@ class FewShotStrategy(WorkflowStrategy):
         agents: dict[str, Agent],
         user_request: str,
         token_callback: Optional[Callable[[str], None]] = None,
+        enable_thinking: bool = False,
     ) -> WorkflowResult:
+
         """
         Execute workflow with LLM deciding handoffs using few-shot examples.
 
@@ -355,15 +402,20 @@ class FewShotStrategy(WorkflowStrategy):
             # 1. EXECUTE CURRENT AGENT
             # Note: We don't force handoff examples into the *worker* agent anymore.
             # Let the worker just do the work.
-            result_response = self._execute_agent(agent, current_context, token_callback=token_callback)
+            raw_response = self._execute_agent(agent, current_context, token_callback=token_callback, enable_thinking=enable_thinking)
+
+            # Extract thoughts
+            clean_response, extracted_thoughts = extract_thoughts(raw_response)
 
             steps.append(
                 WorkflowStep(
                     agent_id=current_agent_id,
                     task=current_context,
                     metadata={
-                        "result": result_response,
+                        "result": clean_response,
+                        "raw_result": raw_response,
                         "iteration": iteration,
+                        "thoughts": extracted_thoughts
                     },
                 )
             )
@@ -371,7 +423,7 @@ class FewShotStrategy(WorkflowStrategy):
             # 2. ROUTER DECISION (Dediciated Step)
             # Ask a "Router" (can be LLM) what to do next based on the result
             decision = self._decide_next_step(
-                domain, agents, current_context, result_response, steps
+                domain, agents, current_context, clean_response, steps
             )
 
             # Record router thought
@@ -391,7 +443,7 @@ class FewShotStrategy(WorkflowStrategy):
                 target = decision.get("target_agent")
                 if target and target in agents:
                     current_agent_id = target
-                    current_context = f"{current_context}\n\n[Previous Agent {agent.id}]: {result_response}"
+                    current_context = f"{current_context}\n\n[Previous Agent {agent.id}]: {clean_response}"
                     print(f"[INFO] Handoff to {target} (Reason: {decision.get('reason')})")
                     continue
             
@@ -511,7 +563,7 @@ Situation: User asked for code review, Planner outlined the plan.
 Decision: {"action": "handoff", "target_agent": "coder", "reason": "Move to implementation phase"}
 """
 
-    def _execute_agent(self, agent: Agent, task: str, token_callback: Optional[Callable[[str], None]] = None) -> str:
+    def _execute_agent(self, agent: Agent, task: str, token_callback: Optional[Callable[[str], None]] = None, enable_thinking: bool = False) -> str:
         """Re-use base execution logic (same as Orchestrator base implementation)."""
         # This duplicates _execute_agent from Orchestrator slightly to avoid mixin complexity for now,
         # or we could make a Mixin. For safety, a simple direct call integration:
@@ -529,6 +581,15 @@ Decision: {"action": "handoff", "target_agent": "coder", "reason": "Move to impl
             
             effective_prompt = get_effective_system_prompt(agent, loaded_skills)
             
+            # Inject thinking instruction if enabled
+            if enable_thinking:
+                thinking_instruction = (
+                    "\n\n[THINKING MODE]\n"
+                    "Before responding, wrap your internal reasoning inside <think>...</think> tags. "
+                    "Show your thought process step by step. After the </think> tag, provide your final answer."
+                )
+                effective_prompt = effective_prompt + thinking_instruction
+            
             full_resp = ""
             for chunk in llm.stream_chat(
                 model=agent.model_name or "default",
@@ -543,6 +604,7 @@ Decision: {"action": "handoff", "target_agent": "coder", "reason": "Move to impl
             return full_resp
         except Exception as e:
             return f"Error: {e}"
+
 
 
 class HybridStrategy(WorkflowStrategy):
@@ -777,6 +839,10 @@ def get_workflow_strategy(domain: DomainConfig) -> WorkflowStrategy:
     # Fallback to metadata
     if workflow_type == "supervisor" and "workflow_type" in domain.metadata:
         workflow_type = domain.metadata["workflow_type"]
+
+    if workflow_type == "social_simulation":
+        from src.infrastructure.langgraph.social_strategy import SocialSimulationStrategy
+        return SocialSimulationStrategy()
 
     strategies = {
         "orchestrator": OrchestratorStrategy,

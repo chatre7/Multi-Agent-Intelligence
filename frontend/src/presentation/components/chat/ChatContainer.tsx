@@ -25,6 +25,7 @@ export default function ChatContainer({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocketClient | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [thinkingEnabled, setThinkingEnabled] = useState(false);
 
   // Initialize WebSocket
   useEffect(() => {
@@ -45,42 +46,47 @@ export default function ChatContainer({
 
         wsRef.current.on("message_complete", (data) => {
           store.setIsStreaming(false);
-          // Update agent_id from message_complete payload
-          if (data.agentId) {
-            store.updateLastMessageAgentId(data.agentId);
+          // Update agent_id from message_complete (handles both casing)
+          const agentId = data.agentId || data.agent_id;
+          if (agentId) {
+            store.updateLastMessageAgentId(agentId);
           }
         });
 
         wsRef.current.on("tool_approval_required", (data) => {
-          if (data.payload) {
+          const payload = data.payload || data;
+          if (payload?.requestId) {
             store.addPendingApproval({
-              requestId: data.payload.requestId,
-              toolName: data.payload.toolName,
-              toolArgs: data.payload.toolArgs,
-              description: data.payload.description,
-              agentName: data.payload.agentName || "System"
+              requestId: payload.requestId,
+              toolName: payload.toolName,
+              toolArgs: payload.toolArgs,
+              description: payload.description,
+              agentName: payload.agentName || "System"
             });
           }
         });
 
         wsRef.current.on("agent_selected", (data) => {
-          if (data.agent_id) {
-            store.updateLastMessageAgentId(data.agent_id);
+          const agentId = data.agent_id || data.agentId;
+          if (agentId) {
+            store.updateLastMessageAgentId(agentId);
           }
         });
 
         wsRef.current.on("workflow_handoff", (data) => {
-          if (data.payload) {
+          const payload = data.payload || data;
+          if (payload?.toAgent) {
             store.addHandoffMarker(
-              data.payload.fromAgent || "Router",
-              data.payload.toAgent || "Unknown"
+              payload.fromAgent || "Router",
+              payload.toAgent || "Unknown"
             );
           }
         });
 
         wsRef.current.on("workflow_thought", (data) => {
-          if (data.payload && data.payload.reason) {
-            store.appendThought(data.payload.reason, data.payload.agentName || "System");
+          const payload = data.payload || data;
+          if (payload?.reason) {
+            store.appendThought(payload.reason, payload.agentName || "System");
           }
         });
 
@@ -149,6 +155,7 @@ export default function ChatContainer({
       conversationId: conversationId,
       payload: {
         content: content,
+        enableThinking: thinkingEnabled,
       },
     } as any);
 
@@ -201,14 +208,35 @@ export default function ChatContainer({
           </div>
         ) : (
           <>
-            {store.currentConversation.messages.map((message, index) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                isLast={index === store.currentConversation!.messages.length - 1}
-                isStreaming={store.isStreaming && index === store.currentConversation!.messages.length - 1}
-              />
-            ))}
+            {store.currentConversation.messages.map((message, index) => {
+              const messages = store.currentConversation!.messages;
+              const isLast = index === messages.length - 1;
+
+              // Smart isStreaming logic: 
+              // True if it's the last message AND we're streaming,
+              // OR if it's the last ASSISTANT message AND we're streaming (handles handoff system markers)
+              let isMsgStreaming = store.isStreaming && isLast;
+
+              if (store.isStreaming && message.role === 'assistant') {
+                let lastAssistantIndex = -1;
+                for (let i = messages.length - 1; i >= 0; i--) {
+                  if (messages[i].role === 'assistant') {
+                    lastAssistantIndex = i;
+                    break;
+                  }
+                }
+                if (index === lastAssistantIndex) isMsgStreaming = true;
+              }
+
+              return (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  isLast={isLast}
+                  isStreaming={isMsgStreaming}
+                />
+              );
+            })}
             {store.pendingApprovals.map((req) => (
               <ToolApprovalCard
                 key={req.requestId}
@@ -243,6 +271,8 @@ export default function ChatContainer({
             !wsRef.current?.isConnected() || isConnecting || store.isStreaming
           }
           isLoading={isConnecting}
+          thinkingEnabled={thinkingEnabled}
+          onThinkingChange={setThinkingEnabled}
         />
       </div>
     </div>

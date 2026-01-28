@@ -164,8 +164,9 @@ export class WebSocketClient {
   private handleMessage(message: WebSocketMessage): void {
     const handlers = this.messageHandlers.get(message.type);
     if (handlers) {
-      // Backend sends 'payload', but also support 'data' for compatibility
-      const messageData = (message as any).payload || message.data || {};
+      // Backend sends 'payload', but also support 'data' for compatibility.
+      // If neither exists, pass the whole message (handles root-level fields like agent_id).
+      const messageData = (message as any).payload || message.data || message;
       handlers.forEach((handler) => handler(messageData));
     }
   }

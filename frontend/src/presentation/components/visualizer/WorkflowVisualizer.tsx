@@ -16,6 +16,7 @@ import {
     type NodeTypes,
     type EdgeTypes,
 } from '@xyflow/react';
+import { Zap } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 
 import { AgentNode, type AgentNodeData } from './AgentNode';
@@ -208,6 +209,12 @@ function WorkflowVisualizerComponent({
                                                                 'text-amber-700 dark:text-amber-400'
                                                         }`}>
                                                         {event.agentName}
+                                                        {typeof event.metadata?.skill_id === 'string' && (
+                                                            <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                                                <Zap size={10} className="fill-amber-500 text-amber-600" />
+                                                                {String(event.metadata?.skill_id)}
+                                                            </span>
+                                                        )}
                                                     </span>
                                                 </div>
 
@@ -218,15 +225,15 @@ function WorkflowVisualizerComponent({
                                                         <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
                                                             <span>Handed off to</span>
                                                             <strong className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 rounded">
-                                                                {typeof event.metadata?.toAgent === 'string' ? event.metadata.toAgent : "Next Agent"}
+                                                                {typeof event.metadata?.toAgent === 'string' ? String(event.metadata?.toAgent) : "Next Agent"}
                                                             </strong>
                                                         </span>
                                                     )}
                                                     {isThought && (
                                                         <div className="mt-1 pl-3 border-l-2 border-purple-100 dark:border-purple-900/50 italic opacity-90">
                                                             {typeof event.content === 'string' ? event.content :
-                                                                typeof event.metadata?.reason === 'string' ? event.metadata.reason :
-                                                                    typeof event.metadata?.thought === 'string' ? event.metadata.thought :
+                                                                typeof event.metadata?.reason === 'string' ? String(event.metadata?.reason) :
+                                                                    typeof event.metadata?.thought === 'string' ? String(event.metadata?.thought) :
                                                                         "Thinking..."}
                                                         </div>
                                                     )}

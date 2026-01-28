@@ -10,6 +10,7 @@ import type {
   Agent,
   ToolRun,
   Skill,
+  Message,
 } from "../../domain/entities/types";
 import { resolveApiBaseUrl } from "../config/urls";
 
@@ -121,8 +122,17 @@ export class ApiClient {
     return response.data;
   }
 
-  async listConversations(): Promise<Conversation[]> {
-    const response = await this.client.get<Conversation[]>("/conversations");
+  async listConversations(domainId?: string): Promise<Conversation[]> {
+    const response = await this.client.get<Conversation[]>("/conversations", {
+      params: domainId ? { domain_id: domainId } : {},
+    });
+    return response.data;
+  }
+
+  async listConversationMessages(id: string): Promise<Message[]> {
+    const response = await this.client.get<Message[]>(
+      `/conversations/${id}/messages`,
+    );
     return response.data;
   }
 
@@ -200,6 +210,17 @@ export class ApiClient {
 
   async detachSkill(agentId: string, skillId: string): Promise<void> {
     await this.client.delete(`/agents/${agentId}/skills/${skillId}`);
+  }
+
+  // Chat endpoints
+  async sendMessage(request: {
+    domain_id: string;
+    message: string;
+    conversation_id?: string;
+    enable_thinking?: boolean;
+  }): Promise<any> {
+    const response = await this.client.post("/chat/send", request);
+    return response.data;
   }
 }
 
