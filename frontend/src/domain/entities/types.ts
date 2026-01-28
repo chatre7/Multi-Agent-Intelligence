@@ -32,6 +32,12 @@ export interface Message {
   timestamp: string;
   delta?: string;
   agent_id?: string;
+  thoughts?: {
+    content: string;
+    agentName: string;
+    timestamp: string;
+  }[];
+  metadata?: Record<string, any>;
 }
 
 export interface Conversation {
@@ -42,6 +48,14 @@ export interface Conversation {
   messages: Message[];
   created_at: string;
   updated_at: string;
+}
+
+export interface ToolApprovalRequest {
+  requestId: string;
+  toolName: string;
+  toolArgs: Record<string, unknown>;
+  description?: string;
+  agentName: string;
 }
 
 export interface ToolRun {

@@ -10,6 +10,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import uuid4
+import functools
+import asyncio
+import queue
+import threading
 
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
@@ -25,6 +29,7 @@ from src.application.use_cases.skills import get_effective_system_prompt
 from pathlib import Path
 import queue
 import threading
+import asyncio
 
 
 @dataclass(frozen=True)
@@ -202,7 +207,7 @@ class SendMessageUseCase:
             messages=messages,
         )
 
-    def stream(self, request: SendMessageRequest) -> Iterable[SendMessageStreamEvent]:
+    async def stream(self, request: SendMessageRequest) -> Iterable[SendMessageStreamEvent]:
         """Stream response events for a request.
 
         Notes
@@ -210,16 +215,17 @@ class SendMessageUseCase:
         Uses LangGraph streaming to surface routing decisions, then streams tokens from
         the configured LLM provider.
         """
-        bundle = self._bundle()
+        bundle = await self._run_sync(self.loader.load_bundle)
         domain = bundle.domains.get(request.domain_id)
         if domain is None:
             raise ValueError(f"Unknown domain_id: {request.domain_id}")
 
         conversation_id = request.conversation_id or str(uuid4())
         if self.conversation_repo is not None:
-            existing = self.conversation_repo.get_conversation(conversation_id)
+            existing = await self._run_sync(self.conversation_repo.get_conversation, conversation_id)
             if existing is None:
-                self.conversation_repo.create_conversation(
+                await self._run_sync(
+                    self.conversation_repo.create_conversation,
                     Conversation(
                         id=conversation_id,
                         domain_id=request.domain_id,
@@ -234,7 +240,8 @@ class SendMessageUseCase:
             ):
                 if existing.created_by_sub != request.subject:
                     raise PermissionError("Not allowed to access this conversation.")
-            self.conversation_repo.add_message(
+            await self._run_sync(
+                self.conversation_repo.add_message,
                 Message(
                     id=str(uuid4()),
                     conversation_id=conversation_id,
@@ -256,26 +263,34 @@ class SendMessageUseCase:
         processed_thoughts_count = 0 
         reply_text = ""
         
-        # Side-channel for tokens from inside graph nodes
-        token_queue = queue.Queue()
+        # Async Queue for non-blocking consumption
+        loop = asyncio.get_running_loop()
+        token_queue = asyncio.Queue(maxsize=500)
         
         def token_callback(token: str):
-            token_queue.put({"type": "token", "content": token})
+            loop.call_soon_threadsafe(token_queue.put_nowait, {"type": "token", "content": token})
             
         def run_graph():
             try:
                 # Pass token_callback in configuration
                 config = {"configurable": {"thread_id": conversation_id, "token_callback": token_callback}}
                 for state in graph.stream(initial_state, config=config, stream_mode="values"):
-                    token_queue.put({"type": "state", "content": state})
-                token_queue.put(None) # Done
+                    loop.call_soon_threadsafe(token_queue.put_nowait, {"type": "state", "content": state})
+                loop.call_soon_threadsafe(token_queue.put_nowait, None) # Done
             except Exception as e:
-                token_queue.put(e)
+                 loop.call_soon_threadsafe(token_queue.put_nowait, e)
                 
         threading.Thread(target=run_graph, daemon=True).start()
         
         while True:
-            item = token_queue.get()
+            # Async get - releases event loop!
+            try:
+                item = await asyncio.wait_for(token_queue.get(), timeout=120.0) # 2 min timeout safety
+            except asyncio.TimeoutError:
+                # Thread might have died or stuck
+                yield SendMessageStreamEvent(type="error", text="Stream timeout")
+                break
+                
             if item is None:
                 break
             if isinstance(item, Exception):
@@ -382,12 +397,16 @@ class SendMessageUseCase:
 
             reply_parts: list[str] = []
             llm_messages = [{"role": "user", "content": request.message}]
-            for chunk in self.llm.stream_chat(
-                model=agent.model_name,
-                system_prompt=effective_prompt,
-                messages=llm_messages,
-                temperature=agent.temperature,
-                max_tokens=agent.max_tokens,
+            
+            # Use non-blocking iterator for sync LLM stream
+            async for chunk in self._iterate_sync(
+                self.llm.stream_chat(
+                    model=agent.model_name,
+                    system_prompt=effective_prompt,
+                    messages=llm_messages,
+                    temperature=agent.temperature,
+                    max_tokens=agent.max_tokens,
+                )
             ):
                 reply_parts.append(chunk)
                 yield SendMessageStreamEvent(type="delta", text=chunk)
@@ -396,7 +415,8 @@ class SendMessageUseCase:
             messages.append({"role": "assistant", "content": reply_text})
 
         if self.conversation_repo is not None:
-            self.conversation_repo.add_message(
+            await self._run_sync(
+                self.conversation_repo.add_message,
                 Message(
                     id=str(uuid4()),
                     conversation_id=conversation_id,
@@ -419,3 +439,31 @@ class SendMessageUseCase:
                 messages=messages,
             ),
         )
+
+    async def _run_sync(self, func, *args, **kwargs):
+        """Run a synchronous function in a separate thread."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
+
+    async def _iterate_sync(self, generator):
+        """Iterate a synchronous generator in a separate thread."""
+        loop = asyncio.get_running_loop()
+        q = asyncio.Queue(maxsize=100)
+        
+        def _producer():
+            try:
+                for item in generator:
+                    loop.call_soon_threadsafe(q.put_nowait, item)
+                loop.call_soon_threadsafe(q.put_nowait, None)
+            except Exception as e:
+                loop.call_soon_threadsafe(q.put_nowait, e)
+                
+        loop.run_in_executor(None, _producer)
+        
+        while True:
+            item = await q.get()
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+            yield item

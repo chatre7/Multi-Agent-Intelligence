@@ -5,8 +5,11 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import logging
 from dataclasses import asdict
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Header, HTTPException, Response
 from passlib.hash import pbkdf2_sha256
@@ -77,6 +80,8 @@ from src.infrastructure.persistence.sqlite.registered_agents import (
     SqliteRegisteredAgentRepository,
 )
 from src.infrastructure.persistence.sqlite.tool_runs import SqliteToolRunRepository
+from src.infrastructure.persistence.sqlite.domain_repository import SqliteDomainRepository
+from src.infrastructure.persistence.sqlite.agent_repository import SqliteAgentRepository
 from src.presentation.metrics import (
     CHAT_MESSAGES_TOTAL,
     TOOL_RUNS_APPROVED_TOTAL,
@@ -244,6 +249,31 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.on_event("startup")
+    async def sync_yaml_to_sqlite():
+        """Sync Domains and Execution Agents from YAML to SQLite on startup."""
+        logger.info("Initializing SQLite sync for Domains and Agents...")
+
+        # Domain Repository
+        domain_db_path = (os.getenv("CONVERSATION_DB") or "conversations.db")
+        domain_repo = SqliteDomainRepository(domain_db_path)
+        
+        # Agent Repository (for execution agents, typically same DB as domains/convos)
+        agent_db_path = (os.getenv("CONVERSATION_DB") or "conversations.db")
+        agent_repo = SqliteAgentRepository(agent_db_path)
+
+        bundle = loader.load_bundle()
+
+        # Sync Domains
+        for domain in bundle.domains.values():
+            await domain_repo.save(domain)
+        logger.info(f"Synced {len(bundle.domains)} domains to SQLite.")
+
+        # Sync Agents
+        for agent in bundle.agents.values():
+            await agent_repo.save(agent)
+        logger.info(f"Synced {len(bundle.agents)} agents to SQLite.")
 
     auth_mode = (os.getenv("AUTH_MODE", "jwt") or "jwt").lower()
     jwt_config = JwtConfig(secret=os.getenv("AUTH_SECRET", "dev-secret"))

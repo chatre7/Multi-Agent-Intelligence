@@ -3,7 +3,7 @@
  */
 
 import { create } from "zustand";
-import type { Conversation, Message } from "../../domain/entities/types";
+import type { Conversation, Message, ToolApprovalRequest } from "../../domain/entities/types";
 
 interface ConversationStore {
   // State
@@ -12,6 +12,7 @@ interface ConversationStore {
   isLoading: boolean;
   error: string | null;
   isStreaming: boolean;
+  pendingApprovals: ToolApprovalRequest[];
 
   // Actions
   setConversations: (conversations: Conversation[]) => void;
@@ -23,6 +24,10 @@ interface ConversationStore {
   setIsStreaming: (streaming: boolean) => void;
   startNewConversation: (domainId: string, agentId: string) => void;
   updateLastMessageAgentId: (agentId: string) => void;
+  appendThought: (thought: string, agentName: string) => void;
+  addPendingApproval: (request: ToolApprovalRequest) => void;
+  removePendingApproval: (requestId: string) => void;
+  addHandoffMarker: (fromAgent: string, toAgent: string) => void;
   clearError: () => void;
 }
 
@@ -32,6 +37,7 @@ export const useConversationStore = create<ConversationStore>((set) => ({
   isLoading: false,
   error: null,
   isStreaming: false,
+  pendingApprovals: [],
 
   setConversations: (conversations) => set({ conversations }),
 
@@ -84,8 +90,42 @@ export const useConversationStore = create<ConversationStore>((set) => ({
       const lastMessage = messages[messages.length - 1];
       messages[messages.length - 1] = {
         ...lastMessage,
-        agent_id: agentId,
+        agent_id: agentId || '',
       };
+      return {
+        currentConversation: {
+          ...(state.currentConversation as Conversation),
+          messages,
+        },
+      };
+    }),
+
+  appendThought: (thought, agentName) =>
+    set((state) => {
+      if (
+        !state.currentConversation ||
+        state.currentConversation.messages.length === 0
+      ) {
+        return state;
+      }
+      const messages = [...state.currentConversation.messages];
+      const lastMessage = messages[messages.length - 1];
+
+      const newThought = {
+        content: thought,
+        agentName,
+        timestamp: new Date().toISOString(),
+      };
+
+      const updatedThoughts = lastMessage.thoughts
+        ? [...lastMessage.thoughts, newThought]
+        : [newThought];
+
+      messages[messages.length - 1] = {
+        ...lastMessage,
+        thoughts: updatedThoughts,
+      };
+
       return {
         currentConversation: {
           ...state.currentConversation,
@@ -111,6 +151,39 @@ export const useConversationStore = create<ConversationStore>((set) => ({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },
+      pendingApprovals: [],
+    }),
+
+  addPendingApproval: (request) =>
+    set((state) => ({
+      pendingApprovals: [...state.pendingApprovals, request],
+    })),
+
+  removePendingApproval: (requestId) =>
+    set((state) => ({
+      pendingApprovals: state.pendingApprovals.filter(
+        (req) => req.requestId !== requestId
+      ),
+    })),
+
+  addHandoffMarker: (fromAgent, toAgent) =>
+    set((state) => {
+      const handoffMsg: Message = {
+        id: `handoff-${Date.now()}`,
+        role: "system",
+        content: `Transferred from ${fromAgent} to ${toAgent}`,
+        timestamp: new Date().toISOString(),
+        metadata: { isHandoff: true, fromAgent, toAgent },
+      };
+      if (state.currentConversation) {
+        return {
+          currentConversation: {
+            ...state.currentConversation,
+            messages: [...state.currentConversation.messages, handoffMsg],
+          },
+        };
+      }
+      return state;
     }),
 
   clearError: () => set({ error: null }),

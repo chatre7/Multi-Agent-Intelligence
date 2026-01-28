@@ -126,12 +126,12 @@ def register_websocket_routes(
                     )
                 )
                 done = None
-                for event in events:
+                async for event in events:
                     if event.type == "delta":
                         await websocket.send_json(
                             {"type": "delta", "text": event.text or ""}
                         )
-                        await asyncio.sleep(0)
+                        # await asyncio.sleep(0)  # No longer needed with native async iterator
                     if event.type == "done":
                         done = event
                 if done is None or done.response is None:
@@ -499,7 +499,7 @@ def register_websocket_routes(
                         chunks: list[str] = []
                         agent_name = ""
                         try:
-                            for event in chat_use_case.stream(
+                            async for event in chat_use_case.stream(
                                 SendMessageRequest(
                                     domain_id=convo.domain_id,
                                     message=content,

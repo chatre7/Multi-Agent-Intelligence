@@ -8,6 +8,7 @@ import { WebSocketClient } from "../../../infrastructure/websocket/WebSocketClie
 import { apiClient } from "../../../infrastructure/api/apiClient";
 import type { Message } from "../../../domain/entities/types";
 import ChatMessage from "./ChatMessage";
+import ToolApprovalCard from "./ToolApprovalCard";
 import ChatInput from "./ChatInput";
 import { resolveWsEndpointUrl } from "../../../infrastructure/config/urls";
 
@@ -51,12 +52,35 @@ export default function ChatContainer({
         });
 
         wsRef.current.on("tool_approval_required", (data) => {
-          console.log("Tool approval required:", data);
+          if (data.payload) {
+            store.addPendingApproval({
+              requestId: data.payload.requestId,
+              toolName: data.payload.toolName,
+              toolArgs: data.payload.toolArgs,
+              description: data.payload.description,
+              agentName: data.payload.agentName || "System"
+            });
+          }
         });
 
         wsRef.current.on("agent_selected", (data) => {
           if (data.agent_id) {
             store.updateLastMessageAgentId(data.agent_id);
+          }
+        });
+
+        wsRef.current.on("workflow_handoff", (data) => {
+          if (data.payload) {
+            store.addHandoffMarker(
+              data.payload.fromAgent || "Router",
+              data.payload.toAgent || "Unknown"
+            );
+          }
+        });
+
+        wsRef.current.on("workflow_thought", (data) => {
+          if (data.payload && data.payload.reason) {
+            store.appendThought(data.payload.reason, data.payload.agentName || "System");
           }
         });
 
@@ -137,6 +161,30 @@ export default function ChatContainer({
     store.addMessage(assistantMessage);
   };
 
+  const handleApprove = (requestId: string) => {
+    if (wsRef.current && store.currentConversation) {
+      wsRef.current.send({
+        type: "approve_tool",
+        conversationId: store.currentConversation.id,
+        requestId: requestId,
+        payload: { approved: true }
+      } as any);
+      store.removePendingApproval(requestId);
+    }
+  };
+
+  const handleReject = (requestId: string) => {
+    if (wsRef.current && store.currentConversation) {
+      wsRef.current.send({
+        type: "approve_tool",
+        conversationId: store.currentConversation.id,
+        requestId: requestId,
+        payload: { approved: false, reason: "User rejected via UI" }
+      } as any);
+      store.removePendingApproval(requestId);
+    }
+  };
+
   if (!store.currentConversation) {
     return null;
   }
@@ -145,7 +193,7 @@ export default function ChatContainer({
     <div className="h-full flex flex-col bg-white">
       {/* Messages - Fixed height with scroll */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {store.currentConversation.messages.length === 0 ? (
+        {store.currentConversation.messages.length === 0 && store.pendingApprovals.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center px-4">
               <p className="text-gray-400 text-sm">Start a conversation…</p>
@@ -153,8 +201,21 @@ export default function ChatContainer({
           </div>
         ) : (
           <>
-            {store.currentConversation.messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+            {store.currentConversation.messages.map((message, index) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                isLast={index === store.currentConversation!.messages.length - 1}
+                isStreaming={store.isStreaming && index === store.currentConversation!.messages.length - 1}
+              />
+            ))}
+            {store.pendingApprovals.map((req) => (
+              <ToolApprovalCard
+                key={req.requestId}
+                request={req}
+                onApprove={handleApprove}
+                onReject={handleReject}
+              />
             ))}
             <div ref={messagesEndRef} className="h-4" />
           </>

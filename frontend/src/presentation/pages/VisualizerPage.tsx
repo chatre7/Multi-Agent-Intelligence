@@ -445,78 +445,80 @@ export function VisualizerPage() {
     const isDarkMode = document.documentElement.classList.contains('dark');
 
     return (
-        <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
+        <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-950 font-sans">
             {/* Header */}
-            <header className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+            <header className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm z-10">
                 <div className="flex items-center gap-4">
                     <a
                         href="/"
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500"
+                        className="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                         aria-label="Back to home"
                     >
-                        <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                        <ArrowLeft strokeWidth={2} className="w-5 h-5" />
                     </a>
-                    <div>
-                        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                            Live Workflow Visualizer
+                    <div className="flex flex-col">
+                        <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                            Workflow Visualizer
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Beta</span>
                         </h1>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Real-time agent observability
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                            Real-time agent observability & debugging
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    {/* Connection Status */}
-                    <div className="flex items-center gap-2">
-                        <Radio
-                            className={`w-4 h-4 ${isConnected ? 'text-green-500' : 'text-red-500'}`}
-                            aria-hidden="true"
-                        />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {isConnected ? 'Connected' : 'Disconnected'}
-                        </span>
+                <div className="flex items-center gap-3">
+                    {/* Connection Status Badge */}
+                    <div className={`px-3 py-1.5 rounded-full border flex items-center gap-2 text-xs font-medium transition-colors ${isConnected
+                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800'
+                        : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
+                        }`}>
+                        <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                        {isConnected ? 'Live Connected' : 'Disconnected'}
                     </div>
 
+                    <div className="h-6 w-px bg-gray-200 dark:bg-gray-800 mx-2" />
+
                     {/* Conversation Selector */}
-                    <select
-                        value={selectedConversation?.id || ''}
-                        onChange={(e) => {
-                            const convo = conversations.find(c => c.id === e.target.value);
-                            if (convo) handleSelectConversation(convo);
-                        }}
-                        disabled={isLoading}
-                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
-                        aria-label="Select conversation"
-                    >
-                        <option value="">
-                            {isLoading ? 'Loading…' : conversations.length === 0 ? 'No conversations' : 'Select Conversation…'}
-                        </option>
-                        {conversations.map(c => (
-                            <option key={c.id} value={c.id}>
-                                {c.domainId} - {c.id.slice(0, 8)}
+                    <div className="relative min-w-[240px]">
+                        <select
+                            value={selectedConversation?.id || ''}
+                            onChange={(e) => {
+                                const convo = conversations.find(c => c.id === e.target.value);
+                                if (convo) handleSelectConversation(convo);
+                            }}
+                            disabled={isLoading}
+                            className="w-full pl-3 pr-8 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm font-medium text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50 transition-all hover:bg-white dark:hover:bg-gray-700"
+                        >
+                            <option value="">
+                                {isLoading ? 'Loading...' : conversations.length === 0 ? 'No active sessions' : 'Select a session...'}
                             </option>
-                        ))}
-                    </select>
+                            {conversations.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.domainId.toUpperCase()} • {c.id.slice(0, 8)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-                    {/* Reset Button */}
-                    <button
-                        onClick={handleReset}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500"
-                        aria-label="Reset visualization"
-                    >
-                        <RefreshCw className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    </button>
-
-                    {/* Export Button */}
-                    <button
-                        onClick={handleExport}
-                        disabled={!selectedConversation || agents.length === 0}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        aria-label="Export workflow as JSON"
-                    >
-                        <Download className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    </button>
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 border-l border-gray-200 dark:border-gray-800 pl-3">
+                        <button
+                            onClick={handleReset}
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                            title="Reset View"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            disabled={!selectedConversation || agents.length === 0}
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors disabled:opacity-30"
+                            title="Export Data"
+                        >
+                            <Download className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -549,15 +551,24 @@ export function VisualizerPage() {
                         </div>
                     </Suspense>
                 ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center">
-                        <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
-                            <Radio className="w-8 h-8 text-gray-400" />
+                    <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-white/50 dark:bg-gray-900/50">
+                        <div className="relative mb-8 group">
+                            <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/30 transition-all duration-500" />
+                            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border border-gray-200 dark:border-gray-700 shadow-xl flex items-center justify-center">
+                                <Radio className="w-10 h-10 text-blue-500 dark:text-blue-400" strokeWidth={1.5} />
+                                <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800">
+                                    <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                                </div>
+                                <div className="absolute -bottom-2 -left-2 w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800">
+                                    <RefreshCw className="w-4 h-4 text-white animate-spin-slow" />
+                                </div>
+                            </div>
                         </div>
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                            No Conversation Selected
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                            Visualizer Connected
                         </h2>
-                        <p className="text-gray-500 dark:text-gray-400 max-w-md">
-                            Start a conversation in the Chat page, then select it here to visualize the agent workflow in real-time.
+                        <p className="text-gray-500 dark:text-gray-400 max-w-md leading-relaxed text-sm">
+                            Select an active conversation from the top bar to inspect agent workflows, latency metrics, and real-time state transitions.
                         </p>
                     </div>
                 )}
