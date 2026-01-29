@@ -86,28 +86,28 @@ class SocialSimulationStrategy(WorkflowStrategy):
             # Generate Prompt
             system_prompt, messages = self._build_prompt(next_agent, topic, simulated_history)
             
-            # Call LLM
-            # Note: We are NOT passing token_callback here to stream every turn to the main chat window
-            # because it would be confusing. We probably want to stream to a specific event listener or just batch it.
-            # If we MUST stream effectively, we might prepend the agent name.
+            # Generate Prompt
+            system_prompt, messages = self._build_prompt(next_agent, topic, simulated_history)
             
-            content = ""
-            for chunk in self.llm.stream_chat(
+            # Use Structured Output
+            from src.domain.entities.schemas import SocialPost
+            
+            print(f"[DEBUG] Invoking Social Agent (Structured): {next_agent.id}")
+            post_model = self.llm.structured_chat(
                 model=next_agent.model_name or "default",
                 system_prompt=system_prompt,
                 messages=messages,
+                response_model=SocialPost,
                 temperature=0.7,
                 max_tokens=500
-            ):
-                content += chunk
+            )
             
-            # Parse Metadata
-            likes = self._parse_likes(content)
-            clean_content = self._clean_content(content)
+            content = post_model.content
+            likes = post_model.likes
             
             # Wrap in JSON to preserve metadata through graph_builder's message mapping
             post_payload = {
-                "content": clean_content,
+                "content": content,
                 "item_id": f"post_{turn}_{self.random.randint(1000,9999)}",
                 "likes": likes,
                 "author": {
@@ -119,8 +119,6 @@ class SocialSimulationStrategy(WorkflowStrategy):
             json_content = self.json.dumps(post_payload)
             
             # Record Step
-            # WorkflowStep(agent_id: str, task: str, metadata: dict)
-            # content goes into metadata['result'] per graph_builder conventions
             step = WorkflowStep(
                 agent_id=next_agent.id,
                 task=f"Turn {turn+1}",
@@ -129,7 +127,8 @@ class SocialSimulationStrategy(WorkflowStrategy):
                     "likes": likes,
                     "agent_name": next_agent.name,
                     "role": next_agent.description or "AI Agent",
-                    "handle": next_agent.metadata.get("handle") or f"@{next_agent.name.lower().replace(' ', '_')}"
+                    "handle": next_agent.metadata.get("handle") or f"@{next_agent.name.lower().replace(' ', '_')}",
+                    "thoughts": [{"content": post_model.thought, "type": "reasoning"}]
                 }
             )
             steps.append(step)
@@ -137,13 +136,13 @@ class SocialSimulationStrategy(WorkflowStrategy):
             # Update Simulated History
             simulated_history.append({
                 "role": "assistant",
-                "content": clean_content,
+                "content": content,
                 "name": next_agent.name
             })
             
-            # Optional: Emit a token to callback to show *something* is happening?
+            # Optional: Emit a token to callback
             if token_callback:
-                token_callback(f"\n\n**@{step.metadata['handle']}**: {clean_content}")
+                token_callback(f"\n\n**@{step.metadata['handle']}**: {content}")
 
         # 2. Final Result
         final_summary = "Social simulation complete."
@@ -165,10 +164,6 @@ class SocialSimulationStrategy(WorkflowStrategy):
         RULES:
         - Keep it very short (max 280 characters).
         - Use a "{agent.name}" personality.
-        - NEVER repeat the instructions or explain your logic.
-        - NEVER output technical classifications, scores, or role assessments (e.g., "Role: 1").
-        - NEVER output bullet points, summaries, or meta-commentary (e.g., "Key Takeaway", "Summary"). This is a CASUAL SOCIAL MEDIA POST.
-        - ALWAYS end your post with <likes>N</likes> (where N is 0-100).
         - Respond in Thai if the topic is in Thai.
         """
         
@@ -182,55 +177,3 @@ class SocialSimulationStrategy(WorkflowStrategy):
                 msgs.append({"role": "assistant", "content": f"{h['name']}: {h['content']}"})
                  
         return system_prompt, msgs
-
-    def _parse_likes(self, content: str) -> int:
-        if "<likes>" in content and "</likes>" in content:
-            try:
-                start = content.find("<likes>") + 7
-                end = content.find("</likes>")
-                return int(content[start:end])
-            except:
-                pass
-        return self.random.randint(0, 50)
-
-    def _clean_content(self, content: str) -> str:
-        import re
-        # 1. Remove common prompt leakage and meta-commentary patterns
-        patterns_to_remove = [
-            r"The user:.*",
-            r"We need a tweet style reply.*",
-            r"Make concise.*",
-            r"Reply to the social media thread.*",
-            r"Task:.*",
-            r"--- End.*",
-            r"1\s+\.\.\.",
-            r"The conversation:.*",
-            r"User asked:.*",
-            r"Summary:.*",
-            r"Key Takeaway:.*",
-            r"Title:.*",
-            r"Topic:.*"
-        ]
-        for p in patterns_to_remove:
-            content = re.sub(p, "", content, flags=re.DOTALL | re.IGNORECASE)
-
-        # 2. Remove <likes> tags (fully or orphaned)
-        content = re.sub(r"<likes>.*?</likes>", "", content, flags=re.DOTALL)
-        content = re.sub(r"</?likes>", "", content, flags=re.IGNORECASE)
-        
-        # 3. Remove <think> tags
-        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
-        
-        # 4. Remove Role Classifications / Score Leakage
-        # Catches patterns like "Test Engineer: 1", "UX Designer: 0", "Role: Score"
-        content = re.sub(r"^[a-zA-Z\s]+:\s*\d+\s*$", "", content, flags=re.MULTILINE)
-        content = re.sub(r"^[a-zA-Z\s]+:\s*(?:High|Medium|Low|None)\s*$", "", content, flags=re.MULTILINE | re.IGNORECASE)
-        # Catches lines that are only numbers (likely leftovers from lists)
-        content = re.sub(r"^\d+\s*$", "", content, flags=re.MULTILINE)
-        
-        # 5. Final trim and cleanup
-        content = content.strip()
-        # If it starts with a name prefix like "Comedian: ", remove it
-        content = re.sub(r"^[a-zA-Z\s]+:\s*", "", content)
-        
-        return content.strip()

@@ -1,6 +1,7 @@
 # Multi-Agent Intelligence Platform
 
-> Zero-code domain extension platform with modern React UI, Clean Architecture + TDD, and real-time character-by-character streaming orchestration.
+> **Build, simulate, and orchestrate expert AI agents with zero code.**
+> A configuration-driven platform featuring real-time character-by-character streaming, clean architecture, and modern React UI.
 
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-green)
 ![Backend Tests](https://img.shields.io/badge/Backend%20Tests-150%2B%20passing-green)
@@ -12,231 +13,242 @@
 
 ---
 
-## 📢 Latest Updates (v1.6.0) - Jan 28, 2026
-
-### 🧵 Threads Persistence & Deep-Linking
-- **Stateful Refresh**: Threads now support `/threads/:id` routing. Refreshing the browser no longer loses simulation state.
-- **Full History Preservation**: Backend now persists *every* agent message in a multi-agent simulation, not just the final response.
-- **Recent Threads Sidebar**: A new "Recent Threads" section in the sidebar allows users to quickly jump between past simulations.
-
-### 🎭 Social Simulation Engine v1.1
-- **Balanced Participation**: Implemented a **Round-Robin** speaker selection to ensure equal participation from all agents in a domain.
-- **Aggressive Sanitization**: Multi-stage regex cleaning removes LLM artifacts (like `<think>` leftovers, role classifications, or scores) for a pure conversational experience.
-- **Domain Isolation**: Agents are now strictly filtered based on the active domain configuration.
-
-### 🧠 Thinking Mode & Integrated Reasoning (v1.5)
-- **Per-Conversation Toggle**: Control visibility of the AI's reasoning process per chat.
-- **Integrated UI**: Reasoning is embedded with a collapsible, "Deep Research" inspired design.
-
----
-
-## 📋 Table of Contents
+## 📖 Table of Contents
 
 - [Overview](#-overview)
-- [Quick Start](#-quick-start)
-  - [Development Mode](#development-mode)
-  - [Production Mode (Docker)](#production-mode-docker)
-  - [Using Ollama (Local LLM)](#using-ollama-local-llm)
-- [Multi-Workflow Capabilities](#-multi-workflow-capabilities)
+- [Key Features](#-key-features)
 - [Architecture](#-architecture)
+- [Getting Started](#-getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Local Development](#local-development)
+  - [Production (Docker)](#production-docker)
+- [Configuration Guide](#-configuration-guide)
+  - [Defining Agents](#defining-agents)
+  - [Domains & Strategies](#domains--strategies)
 - [API Reference](#-api-reference)
-- [WebSocket Protocol](#-websocket-protocol)
-- [Changelog](#-changelog)
-- [Configuration](#-configuration)
-- [Testing](#-testing)
 - [Troubleshooting](#-troubleshooting)
+- [Changelog](#-changelog)
 - [License](#-license)
 
 ---
 
 ## 🎯 Overview
 
-Transform complex multi-agent orchestration into a **configuration-driven platform** where domains and agents are defined via YAML files, synced to SQLite, and exposed through a modern React UI with **instant streaming feedback**.
+The **Multi-Agent Intelligence Platform** transforms complex agent orchestration into a simple, configuration-based workflow. Instead of writing boilerplate Python for every new agent, you define their persona, model, and skills in **YAML**. The system handles the heavy lifting: state management, LLM communication, streaming responses to the frontend, and persisting conversation history.
 
-### Key Features
-
-✅ **Stateful Threads & History** (New)
-- **Deep Linking**: Direct access/refresh support via `/threads/:id`.
-- **Simulation Persistence**: All intermediate agent posts are saved to the database.
-- **Recents Navigation**: Sidebar integration for quick thread switching.
-
-✅ **Advanced Reasoning & Observability**
-- **Thinking Mode**: Toggleable Chain-of-Thought visibility for deep reasoning tasks.
-- **Skill Badges**: Real-time visual feedback when agents apply specific skills.
-
-✅ **Streaming Orchestration**
-- Character-by-character token delivery even across multi-agent handoffs.
-- Non-blocking execution using Python threading/queueing.
-- Real-time visualization of agent thoughts and decisions.
-
-✅ **Configuration-Driven Architecture**
-- Define domains and agents in YAML (e.g., `max_tokens`, `temperature`, `skills`).
-- Automatic SQLite sync for SQL querying.
-- Zero-code domain extension.
-
-✅ **Production-Ready Backend**
-- Clean Architecture (Domain → Application → Infrastructure → Presentation).
-- **TDD First**: 150+ comprehensive unit & integration tests.
-- JWT + RBAC authentication.
-- Optimized Nginx production container with robust healthchecks.
+Whether you're building a customer support swarm, a creative writing team, or a research analysis pipeline, this platform provides the robust foundation you need.
 
 ---
 
-## 🚀 Quick Start
+## 🌟 Key Features
 
-### Prerequisites
+### 1. **Zero-Code Domain Extension**
+Add new agents and domains strictly through configuration files.
+- **Agents**: Define `backend/configs/agents/*.yaml` (e.g., "Storyteller", "Code Reviewer").
+- **Domains**: Define `backend/configs/domains/*.yaml` which groups agents into functional units.
+- **Hot-Reload**: The system detects changes and updates available agents instantly.
 
-- **Python 3.11+** - Backend runtime
-- **Node.js 20+** - Frontend runtime
-- **Docker & Docker Compose** - For production deployment
-- **Ollama** (optional) - Recommended for local LLM (OpenAI-compatible)
+### 2. **Real-Time Streaming Orchestration**
+Experience a "ChatGPT-like" feel with our advanced streaming architecture.
+- **Character-by-Character**: Tokens are pushed to the UI via WebSockets/SSE the moment they are generated.
+- **Multi-Agent Handoff**: Streaming continues seamlessly even as control passes from one agent to another.
+- **Thought Visualization**: See the "Thinking..." process and tool usage in real-time.
 
-### Development Mode
+### 3. **Social Simulation Engine**
+Create dynamic multi-agent conversations where AI characters talk to *each other*.
+- **Round-Robin & Dynamic Turn-Taking**: Agents speak in a natural flow based on the configured strategy.
+- **Observer Mode**: Watch agents debate, brainstorm, or chat without human intervention.
+- **Artifact Cleaning**: Automatic removal of LLM artifacts (e.g., `<think>` tags) for a clean reading experience.
 
-**1. Start Backend**
-```bash
-cd backend
-pip install -e .
-python -m uvicorn src.presentation.api.app:create_app --factory --reload --port 8000
-```
+### 4. **Stateful Threads & History**
+Never lose context.
+- **Persistence**: All messages, including intermediate agent thoughts, are saved to SQLite/PostgreSQL.
+- **Deep Linking**: Share or return to specific conversations via URL (`/threads/:id`).
+- **Sidebar Navigation**: Quickly access your recent simulations and chats.
 
-**2. Start Frontend**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-**3. Open in Browser**
-- Navigate to `http://localhost:5173`
-- Credentials: `admin:admin`, `dev:dev`, or `user:user`
-
-### Production Mode (Docker)
-
-```bash
-# Production optimized build (Nginx + Static React + FastAPI)
-docker compose up -d --build
-# Access at http://localhost
-```
-
----
-
-## 🔀 Multi-Workflow Capabilities
-
-Every domain can utilize a specific strategy defined in its metadata:
-
-| Strategy | Best For | Behavior |
-|----------|----------|----------|
-| **Orchestrator** | Pipelines (DevOps, RAG) | Fixed, linear sequence of specialist agents. |
-| **Few-Shot** | Customer Support, RP | LLM decides routing based on dynamic examples. |
-| **Hybrid** | Research, Planning | Orchestrated planning followed by flexible execution. |
-
-*Streaming is natively supported across all three strategies via the new `token_callback` interface.*
+### 5. **Clean Architecture & TDD**
+Built for maintainability and scale.
+- **Separation of Concerns**: Strict boundaries between Domain, Application, Infrastructure, and Presentation layers.
+- **Test Coverage**: 150+ unit and integration tests ensuring stability.
+- **Type Safety**: Fully typed Python (Pydantic) and TypeScript codebases.
 
 ---
 
 ## 🏗️ Architecture
 
-### Real-Time Streaming Flow (v1.5.0)
+The platform follows a strict **Clean Architecture** pattern to ensure modularity and testability.
 
-```
-[UI] <--- (SSE/WebSocket) --- [FastAPI] --- (Queue) <--- [Streaming Thread]
-                                                              │
-                                                      [LangGraph Execution]
-                                                              │
-                                                      [Agent Node] --(Stream)--> [Tokens]
-                                                              │
-                                                      [Thought Extraction Engine]
-                                                              │
-                                                 (Intercepts <think> & [SKILL] tags)
+### High-Level Data Flow
+
+```mermaid
+graph TD
+    Client[React Frontend] <-->|WebSocket / HTTP| API[FastAPI Gateway]
+    API -->|Command| UC[Use Cases]
+    UC -->|Load| Repo[Repositories (SQLite)]
+    UC -->|Execute| Engine[Workflow Engine]
+    Engine -->|Stream| Queue[Event Queue]
+    Queue -->|Push| API
+    
+    subgraph "Domain Layer"
+    Entities[Agent, Message, Domain]
+    end
+    
+    subgraph "Infrastructure"
+    LLM[LLM Provider (OpenAI/Ollama)]
+    DB[(Database)]
+    end
+    
+    UC --> Entities
+    Engine --> LLM
+    Repo --> DB
 ```
 
-This architecture ensures that as soon as an LLM provider yields a token, it is pushed through a side-channel queue. Simultaneously, the **Thought Extraction Engine** scans for semantic tags (`<think>`, `[USING SKILL]`) to update the UI state (e.g., showing a badge or expanding a card) **before** the text even renders, enhancing perceived responsiveness.
+### Streaming Mechanism
+The system uses a side-channel queue to decouple LLM generation from HTTP response mechanisms, ensuring:
+1. **Low Latency**: First token arrives in milliseconds.
+2. **Resilience**: Long-running agent tasks don't time out HTTP requests.
+3. **Observability**: Tool executions and state changes are streamed as distinct events.
 
 ---
 
-## 🚧 Known Issues
+## 🚀 Getting Started
 
-### 🤖 Social Simulation Artifacts
-While the `social_simulation` strategy provides a realistic autonomous thread experience, some models may still exhibit **Prompt Leakage** or **Technical Meta-data** in their outputs (e.g., orphaned `</likes>` tags or role classification lists like `Test Engineer: 1`).
+### Prerequisites
+- **Python 3.11+**
+- **Node.js 20+**
+- **Docker & Docker Compose** (for production/containerized runs)
+- **Ollama** (optional, for local LLM inference)
 
-- **Current Mitigation**: A regex-based sanitizer in `SocialSimulationStrategy._clean_content` strips most common artifacts.
-- **Future Fix**: We plan to improve the system prompt robustness and implement a Pydantic-based output validator to ensure 100% clean casual text.
+### Local Development
+
+#### 1. Backend Setup
+```bash
+cd backend
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Install dependencies (editable mode)
+pip install -e .
+
+# Run the API server with hot-reload
+python -m uvicorn src.presentation.api.app:create_app --factory --reload --port 8000
+```
+*API docs available at: `http://localhost:8000/docs`*
+
+#### 2. Frontend Setup
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+*Access UI at: `http://localhost:5173`*
+
+### Production (Docker)
+Deploy the full stack (Nginx + React Static Build + FastAPI + Database) with one command.
+
+```bash
+# Build and start all services
+docker compose up -d --build
+
+# View logs
+docker compose logs -f
+```
+*Access Application at: `http://localhost`*
+
+---
+
+## ⚙️ Configuration Guide
+
+### Defining Agents
+Create a YAML file in `backend/configs/agents/`.
+
+**Example: `backend/configs/agents/storyteller.yaml`**
+```yaml
+id: storyteller
+name: Creative Storyteller
+role: "Expert Novelist"
+model_name: "gpt-4o" # or "llama3"
+temperature: 0.9
+max_tokens: 2048
+system_prompt: |
+  You are an expert novelist. 
+  Focus on vivid imagery and emotional depth.
+skills: 
+  - "narrative_design"
+  - "character_development"
+```
+
+### Domains & Strategies
+Domains group agents and define how they interact.
+
+**Example: `backend/configs/domains/creative_writing.yaml`**
+```yaml
+id: creative_writing
+name: "Creative Writing Studio"
+description: "Collaborative story writing environment"
+agents:
+  - storyteller
+  - editor
+  - illustrator
+strategy: "social_simulation" # or "orchestrator", "few_shot"
+```
+
+---
+
+## 🔌 API Reference
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/health` | System health check |
+| `GET` | `/api/v1/agents` | List all available agents |
+| `POST` | `/api/v1/conversations` | Create a new conversation thread |
+| `POST` | `/api/v1/conversations/{id}/message` | Send a message to a thread |
+| `GET` | `/api/v1/conversations/{id}` | Get full conversation history |
+| `GET` | `/api/v1/conversations` | List recent threads |
+
+---
+
+## ❓ Troubleshooting
+
+**Q: frontend cannot connect to backend?**
+- Ensure backend is running on port `8000`.
+- Check CORS settings in `app.py`.
+- If using Docker, ensure services share the same network.
+
+**Q: Streaming is working but "Thinking" UI is hidden?**
+- In v1.5+, "Thinking" mode is toggleable. Check the conversation settings in the UI to enable "Show Reasoning".
+
+**Q: LLM returns garbage or artifacts?**
+- Check `backend/configs/agents/*.yaml` temperature settings.
+- Ensure your local Ollama model is loaded: `ollama list`.
 
 ---
 
 ## 📜 Changelog
 
-### [1.6.0] - 2026-01-28
+### [1.6.0] - 2026-01-29
 #### Added
-- **Threads Persistence**: Multi-message saving for social simulations.
-- **Thread History UI**: "Recent Threads" sidebar component.
-- **Deep Routing**: URL support for individual threads (`/threads/:id`).
-- **Round-Robin Selection**: Balanced agent participation in simulations.
-#### Fixed
-- **Simulation Cleanup**: Aggressive regex cleaning for LLM artifacts/scores.
-- **Entity Stability**: Added missing `metadata` attribute to `Agent` entities.
-- **LLM Invocations**: Switched from `.invoke()` to `.stream_chat()` for OpenAI-compatible providers.
-- **Frontend Build**: Resolved missing API client methods and relative import path level errors.
+- **Threads Persistence**: Deep linking (`/threads/:id`) and full history storage.
+- **Recent Threads**: Sidebar navigation for past conversations.
+- **Social Simulation v1.1**: Round-robin turn-taking and artifact cleaning.
 
 ### [1.5.0] - 2026-01-28
 #### Added
-- **Thinking Mode Toggle**: Per-conversation UI toggle to enable/disable reasoning display.
-- **Skill Observability**: "Zap Badges" that appear in real-time when agents apply skills.
-- **Integrated Reasoning UI**: Redesigned "Thinking" section with "Deep Research" aesthetics (collapsible, attributed).
-#### Changed
-- **System Prompt Injection**: Dynamic injection of thinking instructions based on client-side toggle.
-- **Token Streaming**: Enhanced `WebSocketClient` to handle `isStreaming` state more accurately during handoffs.
-#### Fixed
-- **Handoff Persistence**: Resolved bug where thoughts disappeared when switching agents.
-- **Data Ingestion**: Fixed unwrapping of WebSocket payloads for thought events.
-- **Strategy Context**: Fixed `FewShotStrategy` ignoring initial system messages.
+- **Thinking Mode**: Toggleable/Collapsible reasoning UI.
+- **Skill Badges**: Visual indicators for active agent skills.
 
 ### [1.4.0] - 2026-01-27
 #### Added
-- **Token Streaming Side-Channel**: Implementation of `queue.Queue` and `threading.Thread` in `SendMessageUseCase.stream`.
-- **Workflow Callback Interface**: New `token_callback` parameter added to all `WorkflowStrategy` execution methods.
-
----
-
-## ⚙️ Configuration
-
-### Agent Definition (`agents/*.yaml`)
-```yaml
-id: storyteller
-name: Creative Storyteller
-model_name: "gpt-oss:120b-cloud" # Matches your local provider
-temperature: 0.9
-max_tokens: 1024 # Now strictly enforced
-skills: ["narrative_design"]
-```
-
-### Environment
-```env
-LLM_PROVIDER=openai
-OPENAI_BASE_URL=http://host.docker.internal:11434/v1
-LLM_MODEL=llama3
-```
-
----
-
-## 🧪 Testing
-
-```bash
-cd backend
-# Run all tests
-pytest
-# Run strategy-specific tests
-pytest tests/test_orchestrator_validation.py -v
-```
+- **Token Streaming**: Core architecture update for real-time feedback.
 
 ---
 
 ## 📄 License
 
-MIT License - See [LICENSE](./LICENSE) file for details
-
----
-
-**Status**: ✅ Production Ready  
-**Version**: 1.6.0 | **Updated**: January 28, 2026
+MIT License - Copyright © 2026 Multi-Agent Team.

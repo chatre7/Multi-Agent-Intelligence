@@ -291,14 +291,6 @@ class OrchestratorStrategy(WorkflowStrategy):
             if llm is None:
                 raise ImportError("LLM service not available")
 
-            messages = [{"role": "user", "content": task}]
-
-            # Use agent's model or default
-            model = agent.model_name
-            if not model or model == "default":
-                # Default fallback: check env or use 'llama3' for Ollama
-                model = os.getenv("LLM_MODEL", "llama3")
-
             # Load skills and get effective system prompt
             skill_loader = SkillLoader(Path("backend/configs/skills"))
             loaded_skills = []
@@ -309,24 +301,27 @@ class OrchestratorStrategy(WorkflowStrategy):
             
             effective_prompt = get_effective_system_prompt(agent, loaded_skills)
 
-            # Collect full response from stream
-            full_response = ""
-            for chunk in llm.stream_chat(
-                model=model,
+            # Use Structured Output
+            from src.domain.entities.schemas import AgentResponse
+            
+            print(f"[DEBUG] Invoking Orchestrator Agent (Structured): {agent.id}")
+            result = llm.structured_chat(
+                model=agent.model_name or "default",
                 system_prompt=effective_prompt,
-                messages=messages,
+                messages=[{"role": "user", "content": task}],
+                response_model=AgentResponse,
                 temperature=0.7,
-                max_tokens=2000,
-            ):
-                full_response += chunk
-                if token_callback:
-                    token_callback(chunk)
+                max_tokens=2000
+            )
 
-            return full_response
+            # For Orchestrator, we might still want the raw result if it contains tool calls 
+            # that the Orchestrator expects to parse? No, Orchestrator here seems to just 
+            # pipe text between agents.
+            
+            # If there are tool calls in AgentResponse, we should probably handle them,
+            # but Orchestrator currently seems to only care about the response text.
+            return result.response
 
-        except ImportError:
-            # Fallback if dependencies issues
-            return f"[{agent.id}] (LLM Error): Could not import LLM service. Processed: {task[:50]}..."
         except Exception as e:
             # Fallback on runtime error
             print(f"[ERROR] LLM Execution failed for agent {agent.id}: {e}")
@@ -512,33 +507,26 @@ Current Handoff Count: {len(history)}
             if not llm:
                 return {"action": "finish", "reason": "LLM not available"}
 
+            # Import Schema
+            from src.domain.entities.schemas import RoutingDecision
+
             # Use a capable model for routing if possible, or fallback to main model
             router_model = os.getenv("ROUTER_MODEL", os.getenv("LLM_MODEL", "llama3")) 
             
-            # Stricter prompt for smaller models
-            system_prompt += "\nIMPORTANT: Return ONLY raw JSON. No conversational text before or after."
-
-            response_text = ""
-            for chunk in llm.stream_chat(
+            print(f"[DEBUG] Invoking Router (Structured): {router_model}")
+            decision_model = llm.structured_chat(
                 model=router_model,
                 system_prompt=system_prompt,
                 messages=[{"role": "user", "content": user_context}],
-                temperature=0.1, # Low temp for deterministic routing
+                response_model=RoutingDecision,
+                temperature=0.1,  # Low temp for deterministic routing
                 max_tokens=300
-            ):
-                response_text += chunk
+            )
 
-            # Parse JSON with robust extraction
-            # Find first { and last }
-            match = re.search(r'(\{.*\})', response_text, re.DOTALL)
-            if not match:
-                 return {"action": "finish", "reason": f"No JSON block in: {response_text[:50]}..."}
-            
-            clean_json = match.group(1).strip()
-            return json.loads(clean_json)
+            return decision_model.model_dump()
             
         except Exception as e:
-            print(f"[WARN] Router decision failed: {e}. Output was: {response_text}")
+            print(f"[WARN] Router decision failed: {e}")
             return {"action": "finish", "reason": f"Routing error: {str(e)}"}
 
     def _get_routing_examples(self, domain: DomainConfig) -> str:
@@ -581,27 +569,28 @@ Decision: {"action": "handoff", "target_agent": "coder", "reason": "Move to impl
             
             effective_prompt = get_effective_system_prompt(agent, loaded_skills)
             
-            # Inject thinking instruction if enabled
-            if enable_thinking:
-                thinking_instruction = (
-                    "\n\n[THINKING MODE]\n"
-                    "Before responding, wrap your internal reasoning inside <think>...</think> tags. "
-                    "Show your thought process step by step. After the </think> tag, provide your final answer."
-                )
-                effective_prompt = effective_prompt + thinking_instruction
+            # Use Structured Output if possible
+            from src.domain.entities.schemas import AgentResponse
             
-            full_resp = ""
-            for chunk in llm.stream_chat(
+            print(f"[DEBUG] Invoking Agent (Structured): {agent.id}")
+            result = llm.structured_chat(
                 model=agent.model_name or "default",
                 system_prompt=effective_prompt,
                 messages=[{"role": "user", "content": task}],
+                response_model=AgentResponse,
                 temperature=0.7,
                 max_tokens=2000
-            ):
-                full_resp += chunk
-                if token_callback:
-                    token_callback(chunk)
-            return full_resp
+            )
+
+            # Re-format as text with reasoning if needed, but for history we want a clean response
+            # Note: We can include the thought in the final string or keep it strictly for logging.
+            # For backward compat, we return the response part.
+            final_text = result.response
+            if result.thought and enable_thinking:
+                final_text = f"<think>{result.thought}</think>\n{final_text}"
+            
+            return final_text
+
         except Exception as e:
             return f"Error: {e}"
 

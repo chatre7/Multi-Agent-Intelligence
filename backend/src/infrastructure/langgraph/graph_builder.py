@@ -331,82 +331,46 @@ class ConversationGraphBuilder:
                 if llm_messages:
                     print(f"[DEBUG] Last Message: {llm_messages[-1]}")
 
-                # Execute LLM
-                response_chunks = []
+                # Execute LLM with Structured Output
                 try:
-                    for chunk in llm.stream_chat(
+                    # Import Schema
+                    from src.domain.entities.schemas import AgentResponse
+                    
+                    print(f"[DEBUG] Invoking LLM (Structured): {model}")
+                    response_model = llm.structured_chat(
                         model=model,
                         system_prompt=system_prompt,
                         messages=llm_messages,
+                        response_model=AgentResponse,
                         temperature=agent.temperature or 0.7,
                         max_tokens=agent.max_tokens or 2000
-                    ):
-                        response_chunks.append(chunk)
+                    )
+                    
+                    # Convert to internal format
+                    response_text = response_model.response
+                    tool_calls = []
+                    
+                    # Capture Thought
+                    if response_model.thought:
+                        # Append thought to messages logic or store if supported
+                        # For now, we prepend it to the response for visibility or log it
+                        print(f"[DEBUG] Agent Thought: {response_model.thought}")
+                        # We might want to store it in metadata
+                    
+                    for tc in response_model.tool_calls:
+                        tool_calls.append({
+                            "tool": tc.tool,
+                            "params": tc.params,
+                            "metadata": {"thought": tc.thought}
+                        })
+                        print(f"[DEBUG] Valid Structured Tool Call: {tc.tool}")
+
                 except Exception as e:
-                    print(f"[DEBUG] LLM Streaming Error: {e}")
+                    print(f"[ERROR] Structured Chat Failed: {e}")
+                    response_text = f"Error generating response: {e}"
+                    tool_calls = []
                 
-                response_text = "".join(response_chunks).strip()
-                
-                # Parse Tool Calls (JSON)
-                tool_calls = []
-                
-                # Debug: Print raw response to logs
-                print(f"[DEBUG] Raw Agent Response: {response_text}")
-                
-                # 1. Try matching markdown json block
-                json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response_text, re.DOTALL)
-                
-                # 2. If no block, try matching raw JSON object with "tool" key (more robust)
-                if not json_match:
-                    json_match = re.search(r"(\{[\s\S]*?['\"]tool['\"]\s*:[\s\S]*?\})", response_text, re.DOTALL)
-
-                if json_match:
-                    json_str = json_match.group(1)
-                    print(f"[DEBUG] Found JSON candidate: {json_str}")
-                    try:
-                        # Try standard JSON first
-                        tool_call = json.loads(json_str)
-                    except json.JSONDecodeError:
-                        try:
-                            # Fallback to ast.literal_eval for single quotes or non-strict JSON
-                            print("[DEBUG] JSON loads failed, trying ast.literal_eval")
-                            tool_call = ast.literal_eval(json_str)
-                        except Exception as e:
-                            print(f"[DEBUG] Parsing failed: {e}")
-                            tool_call = None
-                            
-                    if tool_call and isinstance(tool_call, dict) and "tool" in tool_call and "params" in tool_call:
-                        tool_calls.append(tool_call)
-                        print(f"[DEBUG] Valid tool call parsed: {tool_call}")
-                
-                # 3. HEURISTIC FALLBACK: If model is dumber and just writes code blocks
-                if not tool_calls:
-                    # Look for code blocks that resemble file creation
-                    # Case A: echo "content" > filename
-                    echo_match = re.search(r"echo\s+['\"](.*?)['\"]\s*>\s*([a-zA-Z0-9_\-\.]+)", response_text)
-                    if echo_match:
-                        content, filename = echo_match.groups()
-                        tool_calls.append({"tool": "save_file", "params": {"file_path": filename, "content": content}})
-                        print(f"[DEBUG] Heuristic match (echo): {filename}")
-                    
-                    # Case B: Python open() write
-                    py_match = re.search(r"with\s+open\(['\"](.*?)['\"]\s*,\s*['\"]w['\"]\)\s*as\s+\w+:\s+\w+\.write\(['\"](.*?)['\"]\)", response_text)
-                    if py_match:
-                        filename, content = py_match.groups()
-                        tool_calls.append({"tool": "save_file", "params": {"file_path": filename, "content": content}})
-                        print(f"[DEBUG] Heuristic match (python): {filename}")
-                    
-                    # Case C: Plain text handoff mention
-                    agent_pattern = "|".join(agents_by_id.keys())
-                    handoff_text_match = re.search(rf"(?:handoff|transfer|send|invoke|ask)\s+.*?\b({agent_pattern})\b", response_text.lower())
-                    if handoff_text_match:
-                        target = handoff_text_match.group(1)
-                        if target in agents_by_id:
-                            tool_calls.append({"tool": "transfer_to_agent", "params": {"target_agent": target, "reason": "Detected via text heuristic"}})
-                            print(f"[DEBUG] Heuristic match (handoff text): {target}")
-
-                if not json_match and not tool_calls:
-                     print("[DEBUG] No JSON pattern or heuristic found")
+                # --- REMOVED LEGACY REGEX PARSING ---
                 
                 messages.append({
                     "role": "assistant", 

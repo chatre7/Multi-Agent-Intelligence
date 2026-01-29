@@ -1,0 +1,15 @@
+id: "brainstorming"
+name: "Brainstorming Session"
+description: "A structured brainstorming session with a Moderator, Proponent, and Opponent."
+workflow_type: "social_simulation"
+agents:
+  - "moderator"
+  - "proponent"
+  - "opponent"
+allowed_roles:
+  - "user"
+  - "admin"
+metadata:
+  social_simulation:
+    max_turns: 10
+    system_instruction: "Simulate a productive brainstorming session."
