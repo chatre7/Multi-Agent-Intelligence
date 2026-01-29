@@ -144,6 +144,10 @@ class RegistryAgentHeartbeatRequest(BaseModel):
     pass
 
 
+class ThreadStatusUpdateRequest(BaseModel):
+    status: str = Field(..., min_length=1)
+
+
 class SkillImportRequest(BaseModel):
     url: str = Field(..., min_length=1)
     branch: str | None = None
@@ -237,6 +241,22 @@ def create_app() -> FastAPI:
                 skill_repo.save(skill)
     except Exception as e:
         print(f"Warning: Failed to seed skills: {e}")
+
+    # Knowledge Base Initialization (RAG)
+    knowledge_db_path = str(data_dir / "knowledge.db")
+    from src.infrastructure.persistence.sqlite.knowledge_repository import SqliteKnowledgeRepository
+    from src.infrastructure.persistence.chroma.knowledge_repository import ChromaKnowledgeRepository
+    from src.application.use_cases.knowledge import UploadKnowledgeUseCase, ListKnowledgeUseCase, DeleteKnowledgeUseCase
+
+    sqlite_knowledge_repo = SqliteKnowledgeRepository(knowledge_db_path)
+    chroma_knowledge_repo = ChromaKnowledgeRepository() # Uses default Env var or path
+
+    upload_knowledge_uc = UploadKnowledgeUseCase(sqlite_knowledge_repo, chroma_knowledge_repo)
+    list_knowledge_uc = ListKnowledgeUseCase(sqlite_knowledge_repo)
+    delete_knowledge_uc = DeleteKnowledgeUseCase(sqlite_knowledge_repo, chroma_knowledge_repo)
+
+    from src.application.use_cases.merge_thread import MergeThreadUseCase
+    merge_thread_uc = MergeThreadUseCase(conversation_repo, upload_knowledge_uc)
 
     from fastapi.middleware.cors import CORSMiddleware
 
@@ -795,6 +815,7 @@ def create_app() -> FastAPI:
             for s in skills
         ]
 
+
     @app.post("/v1/agents/{agent_id}/skills")
     def attach_skill(
         agent_id: str,
@@ -831,6 +852,64 @@ def create_app() -> FastAPI:
 
         skill_repo.remove_skill_from_agent(agent_id, skill_id)
         return {"status": "success"}
+
+    from fastapi import UploadFile, File
+    
+    @app.post("/v1/knowledge/upload")
+    async def upload_knowledge(
+        file: UploadFile = File(...),
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            # Reusing AGENT_WRITE for now, or add new KNOWLEDGE_WRITE permission later
+            require_permission_set(perms, Permission.AGENT_WRITE)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        
+        try:
+            content_bytes = await file.read()
+            content_str = content_bytes.decode("utf-8") # Assume text for MVP
+            
+            doc = upload_knowledge_uc.execute(
+                filename=file.filename or "uploaded_file",
+                content=content_str,
+                content_type=file.content_type or "text/plain"
+            )
+            return doc.to_dict()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Upload failed: {str(e)}")
+
+    @app.get("/v1/knowledge")
+    def list_knowledge(
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> list[dict[str, Any]]:
+        _sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+             # Reusing AGENT_READ for now
+            require_permission_set(perms, Permission.AGENT_READ)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        
+        docs = list_knowledge_uc.execute()
+        return [doc.to_dict() for doc in docs]
+
+    @app.delete("/v1/knowledge/{document_id}")
+    def delete_knowledge(
+        document_id: str,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        try:
+            require_permission_set(perms, Permission.AGENT_WRITE)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        
+        delete_knowledge_uc.execute(document_id)
+        return {"ok": True}
 
     @app.post("/v1/chat")
     def chat(
@@ -969,6 +1048,51 @@ def create_app() -> FastAPI:
             title=f"Chat with {payload.agent_id}",
         )
         conversation_repo.create_conversation(convo)
+        return convo.to_dict()
+
+    @app.patch("/v1/conversations/{conversation_id}/status")
+    def update_conversation_status(
+        conversation_id: str,
+        payload: ThreadStatusUpdateRequest,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        # Check permissions? For now, allow all authenticated users.
+        
+        convo = conversation_repo.get_conversation(conversation_id)
+        if not convo:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+            
+        try:
+            from src.domain.entities.conversation import ThreadStatus
+            new_status = ThreadStatus(payload.status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid status")
+            
+        convo.status = new_status
+        convo.touch()
+        conversation_repo.update_conversation(convo)
+        return convo.to_dict()
+
+    @app.post("/v1/conversations/{conversation_id}/merge")
+    def merge_thread(
+        conversation_id: str,
+        x_role: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        sub, role, perms = resolve_principal(x_role=x_role, authorization=authorization)
+        # Check permissions?
+        
+        try:
+            merge_thread_uc.execute(conversation_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            logger.error(f"Merge failed: {e}")
+            raise HTTPException(status_code=500, detail="Merge failed")
+            
+        convo = conversation_repo.get_conversation(conversation_id)
         return convo.to_dict()
 
     @app.get("/v1/conversations")

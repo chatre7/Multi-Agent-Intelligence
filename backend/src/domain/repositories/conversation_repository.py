@@ -16,6 +16,10 @@ class IConversationRepository(ABC):
         """Persist new conversation."""
 
     @abstractmethod
+    def update_conversation(self, conversation: Conversation) -> None:
+        """Update existing conversation."""
+
+    @abstractmethod
     def get_conversation(self, conversation_id: str) -> Conversation | None:
         """Fetch conversation."""
 

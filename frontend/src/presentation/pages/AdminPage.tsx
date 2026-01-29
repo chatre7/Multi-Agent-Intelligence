@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Settings, BarChart3, Users, Package, RefreshCw } from "lucide-react";
+import { Settings, BarChart3, Users, Package, RefreshCw, Database } from "lucide-react";
 import StatCard from "../components/admin/StatCard";
 import MetricsChart from "../components/admin/MetricsChart";
 import ActivityFeed from "../components/admin/ActivityFeed";
@@ -16,6 +16,10 @@ import { ToolApprovalModal } from "../components/admin/ToolApprovalModal";
 import { useMetricsStore } from "../../infrastructure/stores/metricsStore";
 import type { DomainConfig, Agent, ToolRun } from "../../domain/entities/types";
 import { apiClient } from "../../infrastructure/api/apiClient";
+import { KnowledgeUpload } from "../components/admin/KnowledgeUpload";
+import { KnowledgeList } from "../components/admin/KnowledgeList";
+
+import { useKnowledge } from "../hooks/useKnowledge";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -25,6 +29,14 @@ export default function AdminPage() {
   );
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [selectedToolRun, setSelectedToolRun] = useState<ToolRun | null>(null);
+
+  // Use Custom Hook for Knowledge Logic
+  const {
+    documents,
+    isLoading: isDocsLoading,
+    fetchDocuments,
+    deleteDocument
+  } = useKnowledge();
 
   const {
     metrics,
@@ -37,6 +49,13 @@ export default function AdminPage() {
     stopAutoRefresh,
     refreshAll,
   } = useMetricsStore();
+
+  // Fetch documents when Knowledge tab is active
+  useEffect(() => {
+    if (activeTab === "knowledge") {
+      fetchDocuments();
+    }
+  }, [activeTab, fetchDocuments]);
 
   // Start auto-refresh on mount
   useEffect(() => {
@@ -57,6 +76,7 @@ export default function AdminPage() {
     { id: "overview", label: "Overview", icon: BarChart3 },
     { id: "domains", label: "Domains", icon: Package },
     { id: "agents", label: "Agents", icon: Users },
+    { id: "knowledge", label: "Knowledge", icon: Database },
     { id: "tools", label: "Tool Approval", icon: BarChart3 },
     { id: "settings", label: "Settings", icon: Settings },
   ];
@@ -136,8 +156,8 @@ export default function AdminPage() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
-                      ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
                     }`}
                 >
                   <Icon size={18} />
@@ -403,6 +423,30 @@ export default function AdminPage() {
                 }}
               />
             )}
+          </div>
+        )}
+
+        {activeTab === "knowledge" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 className="text-lg font-semibold mb-4">Upload Documents</h2>
+                <KnowledgeUpload onUploadComplete={fetchDocuments} />
+              </div>
+            </div>
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">Knowledge Base</h2>
+                  <button onClick={fetchDocuments} className="text-sm text-blue-600 hover:underline">Refresh</button>
+                </div>
+                <KnowledgeList
+                  documents={documents}
+                  onDelete={deleteDocument}
+                  isLoading={isDocsLoading}
+                />
+              </div>
+            </div>
           </div>
         )}
 

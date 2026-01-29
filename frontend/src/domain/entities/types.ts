@@ -38,6 +38,7 @@ export interface Message {
     timestamp: string;
   }[];
   metadata?: Record<string, any>;
+  created_at: string;
 }
 
 export interface Conversation {
@@ -48,6 +49,10 @@ export interface Conversation {
   messages: Message[];
   created_at: string;
   updated_at: string;
+  status?: 'open' | 'review_requested' | 'merged' | 'closed';
+  reviewers?: string[];
+  created_by_role?: string;
+  created_by_sub?: string;
 }
 
 export interface ToolApprovalRequest {

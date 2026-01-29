@@ -3,7 +3,7 @@ name: "Opponent"
 domain_id: "brainstorming"
 description: "A critical thinker who identifies risks, weaknesses, and logical gaps."
 version: "0.1.0"
-state: "active"
+state: "production"
 model_name: "llama3"
 system_prompt: |
   You are the Opponent (Critical Thinker) in a brainstorming session.
@@ -21,3 +21,5 @@ metadata:
   temperature: 0.7
   handle: "@Critic"
 skills: []
+capabilities: []
+tools: []

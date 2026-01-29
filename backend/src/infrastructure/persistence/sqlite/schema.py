@@ -13,6 +13,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
             created_by_role TEXT NOT NULL,
             created_by_sub TEXT NOT NULL,
             title TEXT,
+            status TEXT NOT NULL DEFAULT 'open',
+            reviewers TEXT, -- JSON list of agent IDs
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             metadata TEXT  -- JSON string

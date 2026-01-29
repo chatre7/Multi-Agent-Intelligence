@@ -198,6 +198,7 @@ export const useConversationStore = create<ConversationStore>((set) => ({
         role: "system",
         content: `Transferred from ${fromAgent} to ${toAgent}`,
         timestamp: new Date().toISOString(),
+        created_at: new Date().toISOString(),
         metadata: { isHandoff: true, fromAgent, toAgent },
       };
       if (state.currentConversation) {

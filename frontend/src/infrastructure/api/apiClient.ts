@@ -136,6 +136,21 @@ export class ApiClient {
     return response.data;
   }
 
+  async updateConversationStatus(id: string, status: string): Promise<Conversation> {
+    const response = await this.client.patch<Conversation>(
+      `/conversations/${id}/status`,
+      { status }
+    );
+    return response.data;
+  }
+
+  async mergeThread(id: string): Promise<Conversation> {
+    const response = await this.client.post<Conversation>(
+      `/conversations/${id}/merge`
+    );
+    return response.data;
+  }
+
   // Tool run endpoints
   async listToolRuns(): Promise<ToolRun[]> {
     const response = await this.client.get<ToolRun[]>("/tool-runs");
@@ -210,6 +225,27 @@ export class ApiClient {
 
   async detachSkill(agentId: string, skillId: string): Promise<void> {
     await this.client.delete(`/agents/${agentId}/skills/${skillId}`);
+  }
+
+  // Knowledge Base endpoints
+  async uploadKnowledge(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await this.client.post("/knowledge/upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  }
+
+  async listKnowledge(): Promise<any[]> {
+    const response = await this.client.get("/knowledge");
+    return response.data;
+  }
+
+  async deleteKnowledge(documentId: string): Promise<void> {
+    await this.client.delete(`/knowledge/${documentId}`);
   }
 
   // Chat endpoints

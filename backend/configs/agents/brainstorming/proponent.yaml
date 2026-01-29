@@ -3,7 +3,7 @@ name: "Proponent"
 domain_id: "brainstorming"
 description: "A creative visionary who proposes new ideas and defends their potential."
 version: "0.1.0"
-state: "active"
+state: "production"
 model_name: "llama3"
 system_prompt: |
   You are the Proponent in a brainstorming session.
@@ -20,3 +20,5 @@ metadata:
   temperature: 0.9
   handle: "@IdeaMaker"
 skills: []
+capabilities: []
+tools: []

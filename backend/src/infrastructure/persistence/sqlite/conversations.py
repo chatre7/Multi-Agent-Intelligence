@@ -63,8 +63,12 @@ class SqliteConversationRepository(IConversationRepository):
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO conversations (id, domain_id, created_by_role, created_by_sub, title, created_at, updated_at, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO conversations (
+                    id, domain_id, created_by_role, created_by_sub,
+                    title, status, reviewers,
+                    created_at, updated_at, metadata
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     conversation.id,
@@ -72,9 +76,34 @@ class SqliteConversationRepository(IConversationRepository):
                     conversation.created_by_role,
                     conversation.created_by_sub,
                     conversation.title,
+                    conversation.status.value,
+                    json.dumps(conversation.reviewers),
                     conversation.created_at.isoformat(),
                     conversation.updated_at.isoformat(),
                     json.dumps(conversation.metadata),
+                ),
+            )
+
+    def update_conversation(self, conversation: Conversation) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE conversations
+                SET domain_id = ?, created_by_role = ?, created_by_sub = ?,
+                    title = ?, status = ?, reviewers = ?,
+                    updated_at = ?, metadata = ?
+                WHERE id = ?
+                """,
+                (
+                    conversation.domain_id,
+                    conversation.created_by_role,
+                    conversation.created_by_sub,
+                    conversation.title,
+                    conversation.status.value,
+                    json.dumps(conversation.reviewers),
+                    conversation.updated_at.isoformat(),
+                    json.dumps(conversation.metadata),
+                    conversation.id,
                 ),
             )
 
@@ -92,6 +121,8 @@ class SqliteConversationRepository(IConversationRepository):
             created_by_role=str(row["created_by_role"]),
             created_by_sub=str(row["created_by_sub"]),
             title=row["title"],
+            status=Conversation.ThreadStatus(row["status"]),
+            reviewers=json.loads(row["reviewers"]) if row["reviewers"] else [],
             created_at=_parse_iso(str(row["created_at"])),
             updated_at=_parse_iso(str(row["updated_at"])),
             metadata=json.loads(row["metadata"]) if row["metadata"] else {},
@@ -182,6 +213,8 @@ class SqliteConversationRepository(IConversationRepository):
                 created_by_role=str(row["created_by_role"]),
                 created_by_sub=str(row["created_by_sub"]),
                 title=row["title"],
+                status=Conversation.ThreadStatus(row["status"]),
+                reviewers=json.loads(row["reviewers"]) if row["reviewers"] else [],
                 created_at=_parse_iso(str(row["created_at"])),
                 updated_at=_parse_iso(str(row["updated_at"])),
                 metadata=json.loads(row["metadata"]) if row["metadata"] else {},

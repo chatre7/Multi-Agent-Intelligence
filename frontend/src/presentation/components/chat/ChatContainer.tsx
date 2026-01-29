@@ -146,6 +146,7 @@ export default function ChatContainer({
       role: "user",
       content,
       timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
     store.addMessage(userMessage);
 
@@ -164,6 +165,7 @@ export default function ChatContainer({
       role: "assistant",
       content: "",
       timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
     store.addMessage(assistantMessage);
   };

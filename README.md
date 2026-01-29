@@ -60,13 +60,19 @@ Create dynamic multi-agent conversations where AI characters talk to *each other
 - **Observer Mode**: Watch agents debate, brainstorm, or chat without human intervention.
 - **Artifact Cleaning**: Automatic removal of LLM artifacts (e.g., `<think>` tags) for a clean reading experience.
 
-### 4. **Stateful Threads & History**
-Never lose context.
-- **Persistence**: All messages, including intermediate agent thoughts, are saved to SQLite/PostgreSQL.
-- **Deep Linking**: Share or return to specific conversations via URL (`/threads/:id`).
-- **Sidebar Navigation**: Quickly access your recent simulations and chats.
+### 4. **Threads as Pull Requests**
+Review simulations as if they were code.
+- **PR-style Workflow**: Threads have statuses: `Open`, `Review Requested`, `Merged`, and `Closed`.
+- **Merge Action**: "Merging" a thread automatically generates a conversation summary and uploads it to the Knowledge Base.
+- **Collaborative Review**: Highlighted timeline of agent interactions for easy auditing.
 
-### 5. **Clean Architecture & TDD**
+### 5. **Eternal Agent Recall (Knowledge Base)**
+Agents learn from past conversations.
+- **ChromaDB Integration**: Merged threads are vectorized and stored for semantic retrieval.
+- **Knowledge Capture**: Transform casual brainstorming into structured team intelligence.
+- **RAG-Ready**: Future agents can query the Knowledge Base to reference past decisions.
+
+### 6. **Clean Architecture & TDD**
 Built for maintainability and scale.
 - **Separation of Concerns**: Strict boundaries between Domain, Application, Infrastructure, and Presentation layers.
 - **Test Coverage**: 150+ unit and integration tests ensuring stability.
@@ -85,22 +91,25 @@ graph TD
     Client[React Frontend] <-->|WebSocket / HTTP| API[FastAPI Gateway]
     API -->|Command| UC[Use Cases]
     UC -->|Load| Repo[Repositories (SQLite)]
+    UC -->|Query/Add| KB[Knowledge Base - Chroma]
     UC -->|Execute| Engine[Workflow Engine]
     Engine -->|Stream| Queue[Event Queue]
     Queue -->|Push| API
     
     subgraph "Domain Layer"
-    Entities[Agent, Message, Domain]
+    Entities[Agent, Message, Domain, Conversation]
     end
     
     subgraph "Infrastructure"
     LLM[LLM Provider (OpenAI/Ollama)]
-    DB[(Database)]
+    DB[(SQLite/PG)]
+    VecDB[(ChromaDB)]
     end
     
     UC --> Entities
     Engine --> LLM
     Repo --> DB
+    KB --> VecDB
 ```
 
 ### Streaming Mechanism
@@ -116,50 +125,31 @@ The system uses a side-channel queue to decouple LLM generation from HTTP respon
 ### Prerequisites
 - **Python 3.11+**
 - **Node.js 20+**
-- **Docker & Docker Compose** (for production/containerized runs)
-- **Ollama** (optional, for local LLM inference)
+- **Docker & Docker Compose**
+- **ChromaDB** (included in Docker stack)
 
 ### Local Development
 
 #### 1. Backend Setup
 ```bash
 cd backend
-
-# Create virtual environment
 python -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-
-# Install dependencies (editable mode)
+source .venv/bin/activate
 pip install -e .
-
-# Run the API server with hot-reload
 python -m uvicorn src.presentation.api.app:create_app --factory --reload --port 8000
 ```
-*API docs available at: `http://localhost:8000/docs`*
 
 #### 2. Frontend Setup
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
-*Access UI at: `http://localhost:5173`*
 
 ### Production (Docker)
-Deploy the full stack (Nginx + React Static Build + FastAPI + Database) with one command.
-
 ```bash
-# Build and start all services
 docker compose up -d --build
-
-# View logs
-docker compose logs -f
 ```
-*Access Application at: `http://localhost`*
 
 ---
 
@@ -168,20 +158,14 @@ docker compose logs -f
 ### Defining Agents
 Create a YAML file in `backend/configs/agents/`.
 
-**Example: `backend/configs/agents/storyteller.yaml`**
+**Example: `storyteller.yaml`**
 ```yaml
 id: storyteller
 name: Creative Storyteller
 role: "Expert Novelist"
-model_name: "gpt-4o" # or "llama3"
+model_name: "gpt-4o"
 temperature: 0.9
-max_tokens: 2048
-system_prompt: |
-  You are an expert novelist. 
-  Focus on vivid imagery and emotional depth.
-skills: 
-  - "narrative_design"
-  - "character_development"
+skills: ["narrative_design", "character_development"]
 ```
 
 ### Domains & Strategies
@@ -206,11 +190,11 @@ strategy: "social_simulation" # or "orchestrator", "few_shot"
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/api/v1/health` | System health check |
-| `GET` | `/api/v1/agents` | List all available agents |
-| `POST` | `/api/v1/conversations` | Create a new conversation thread |
-| `POST` | `/api/v1/conversations/{id}/message` | Send a message to a thread |
-| `GET` | `/api/v1/conversations/{id}` | Get full conversation history |
 | `GET` | `/api/v1/conversations` | List recent threads |
+| `POST` | `/api/v1/conversations` | Start a new thread |
+| `PATCH` | `/api/v1/conversations/{id}/status` | Update thread status (open/merged/etc) |
+| `POST` | `/api/v1/conversations/{id}/merge` | Process thread and add to Knowledge Base |
+| `GET` | `/api/v1/knowledge` | List documents in the KB |
 
 ---
 
@@ -218,34 +202,27 @@ strategy: "social_simulation" # or "orchestrator", "few_shot"
 
 **Q: frontend cannot connect to backend?**
 - Ensure backend is running on port `8000`.
-- Check CORS settings in `app.py`.
-- If using Docker, ensure services share the same network.
+- Check `mai-nginx` logs if using Docker.
 
-**Q: Streaming is working but "Thinking" UI is hidden?**
-- In v1.5+, "Thinking" mode is toggleable. Check the conversation settings in the UI to enable "Show Reasoning".
-
-**Q: LLM returns garbage or artifacts?**
-- Check `backend/configs/agents/*.yaml` temperature settings.
-- Ensure your local Ollama model is loaded: `ollama list`.
+**Q: Merging a thread fails?**
+- Ensure the `summarizer` agent is configured in `brainstorming.yaml`.
+- Check if ChromaDB container is healthy.
 
 ---
 
 ## 📜 Changelog
 
+### [1.7.0] - 2026-01-30
+#### Added
+- **Threads as Pull Requests**: Full workflow support with statuses and "Merge" functionality.
+- **Knowledge Base (ChromaDB)**: Automatic capture of merged threads into vector storage.
+- **UI Refinement**: Harmonized Shadcn-inspired design across Threads and Admin pages.
+- **Lazy Loading**: Route-based bundle optimization for the frontend.
+
 ### [1.6.0] - 2026-01-29
 #### Added
 - **Threads Persistence**: Deep linking (`/threads/:id`) and full history storage.
 - **Recent Threads**: Sidebar navigation for past conversations.
-- **Social Simulation v1.1**: Round-robin turn-taking and artifact cleaning.
-
-### [1.5.0] - 2026-01-28
-#### Added
-- **Thinking Mode**: Toggleable/Collapsible reasoning UI.
-- **Skill Badges**: Visual indicators for active agent skills.
-
-### [1.4.0] - 2026-01-27
-#### Added
-- **Token Streaming**: Core architecture update for real-time feedback.
 
 ---
 

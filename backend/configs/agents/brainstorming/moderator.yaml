@@ -3,7 +3,7 @@ name: "Moderator"
 domain_id: "brainstorming"
 description: "A neutral moderator who manages the flow of the brainstorming session."
 version: "0.1.0"
-state: "active"
+state: "production"
 model_name: "llama3"
 system_prompt: |
   You are the Moderator of a brainstorming session.
@@ -21,3 +21,5 @@ metadata:
   temperature: 0.1
   handle: "@Mod"
 skills: []
+capabilities: []
+tools: []

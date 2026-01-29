@@ -3,14 +3,14 @@ import { Routes, Route, Link, useLocation, Navigate } from "react-router";
 import LoginPage from "./presentation/pages/LoginPage";
 import ChatPage from "./presentation/pages/ChatPage";
 import AdminPage from "./presentation/pages/AdminPage";
-import ThreadsPage from './presentation/pages/ThreadsPage';
 import { BarChart3, MessageCircle, Route as RouteIcon, Hash } from "lucide-react";
 import { apiClient } from "./infrastructure/api/apiClient";
 import { useAuthStore } from "./infrastructure/stores/authStore";
 import "./App.css";
 
-// Lazy load heavy visualizer page
+// Lazy load heavy pages
 const VisualizerPage = lazy(() => import("./presentation/pages/VisualizerPage"));
+const ThreadsPage = lazy(() => import("./presentation/pages/ThreadsPage"));
 
 function NavLink({ to, children, icon: Icon }: { to: string; children: React.ReactNode; icon: React.ElementType }) {
   const location = useLocation();
@@ -86,11 +86,7 @@ function App() {
 
   return (
     <Routes>
-      {/* Standalone Route for Threads (Custom Layout) */}
-      <Route path="/threads" element={<ThreadsPage />} />
-      <Route path="/threads/:id" element={<ThreadsPage />} />
-
-      {/* Main App Routes with Top Navigation */}
+      {/* Standalone Route? No, move everything into AppLayout for consistency */}
       <Route
         path="/*"
         element={
@@ -106,6 +102,9 @@ function App() {
                   </Suspense>
                 }
               />
+              <Route path="/threads" element={<ThreadsPage />} />
+              <Route path="/threads/:id" element={<ThreadsPage />} />
+
               {/* Redirect unknown routes to chat */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

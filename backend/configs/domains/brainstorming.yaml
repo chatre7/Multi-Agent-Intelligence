@@ -2,6 +2,7 @@ id: "brainstorming"
 name: "Brainstorming Session"
 description: "A structured brainstorming session with a Moderator, Proponent, and Opponent."
 workflow_type: "social_simulation"
+default_agent: "moderator"
 agents:
   - "moderator"
   - "proponent"
