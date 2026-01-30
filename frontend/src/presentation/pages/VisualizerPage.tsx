@@ -3,9 +3,11 @@
  * Lazy-loaded for bundle optimization
  */
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { ArrowLeft, Radio, RefreshCw, Download } from 'lucide-react';
+import { Radio, RefreshCw, Download, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { WebSocketClient, type MessageType } from '../../infrastructure/websocket/WebSocketClient';
 import { apiClient } from '../../infrastructure/api/apiClient';
+import AppHeader from '../components/layout/AppHeader';
+import { useSidebarLayout } from '../components/layout/SidebarLayoutContext';
 import type {
     WorkflowAgentNode,
     WorkflowEdgeData,
@@ -13,6 +15,7 @@ import type {
     AgentStatus
 } from '../../domain/types/workflowVisualizer';
 
+// Lazy load React Flow component for bundle optimization
 // Lazy load React Flow component for bundle optimization
 const WorkflowVisualizer = lazy(() => import('../components/visualizer/WorkflowVisualizer'));
 
@@ -32,6 +35,9 @@ export function VisualizerPage() {
     const [eventLog, setEventLog] = useState<WorkflowEvent[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const sidebar = useSidebarLayout();
+    const sidebarOpen = sidebar?.sidebarOpen ?? true;
+    const setSidebarOpen = sidebar?.setSidebarOpen;
 
     // Get auth token
     const token = localStorage.getItem('auth_token') || '';
@@ -486,59 +492,52 @@ export function VisualizerPage() {
         URL.revokeObjectURL(url);
     }, [selectedConversation, agents, edges, eventLog]);
 
-    // Check dark mode
-    const isDarkMode = document.documentElement.classList.contains('dark');
-
     return (
-        <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-950 font-sans">
+        <div className="flex-1 min-h-0 flex flex-col font-sans">
             {/* Header */}
-            <header className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm z-10">
+            <AppHeader>
                 <div className="flex items-center gap-4">
-                    <a
-                        href="/"
-                        className="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                        aria-label="Back to home"
-                    >
-                        <ArrowLeft strokeWidth={2} className="w-5 h-5" />
-                    </a>
-                    <div className="flex flex-col">
-                        <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-                            Workflow Visualizer
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Beta</span>
-                        </h1>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                            Real-time agent observability & debugging
-                        </p>
+                    {setSidebarOpen && (
+                        <button
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+                        >
+                            {sidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+                        </button>
+                    )}
+                    <div className="text-sm font-semibold text-gray-900">
+                        Visualizer
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                     {/* Connection Status Badge */}
-                    <div className={`px-3 py-1.5 rounded-full border flex items-center gap-2 text-xs font-medium transition-colors ${isConnected
-                        ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800'
-                        : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
-                        }`}>
-                        <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                        {isConnected ? 'Live Connected' : 'Disconnected'}
+                    <div
+                        className={`px-3 py-1.5 rounded-full border flex items-center gap-2 text-xs font-medium transition-colors ${isConnected
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : "bg-red-50 text-red-700 border-red-200"
+                            }`}
+                    >
+                        <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+                        {isConnected ? "Live Connected" : "Disconnected"}
                     </div>
-
-                    <div className="h-6 w-px bg-gray-200 dark:bg-gray-800 mx-2" />
 
                     {/* Conversation Selector */}
                     <div className="relative min-w-[240px]">
                         <select
-                            value={selectedConversation?.id || ''}
+                            value={selectedConversation?.id || ""}
                             onChange={(e) => {
-                                const convo = conversations.find(c => c.id === e.target.value);
+                                const convo = conversations.find((c) => c.id === e.target.value);
                                 if (convo) handleSelectConversation(convo);
                             }}
                             disabled={isLoading}
-                            className="w-full pl-3 pr-8 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm font-medium text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50 transition-all hover:bg-white dark:hover:bg-gray-700"
+                            className="w-full pl-3 pr-8 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50 transition-all hover:bg-white"
                         >
                             <option value="">
-                                {isLoading ? 'Loading...' : conversations.length === 0 ? 'No active sessions' : 'Select a session...'}
+                                {isLoading ? "Loading..." : conversations.length === 0 ? "No active sessions" : "Select a session..."}
                             </option>
-                            {conversations.map(c => (
+                            {conversations.map((c) => (
                                 <option key={c.id} value={c.id}>
                                     {c.domainId.toUpperCase()} • {c.id.slice(0, 8)}
                                 </option>
@@ -547,10 +546,10 @@ export function VisualizerPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-1 border-l border-gray-200 dark:border-gray-800 pl-3">
+                    <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
                         <button
                             onClick={handleReset}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
                             title="Reset View"
                         >
                             <RefreshCw className="w-4 h-4" />
@@ -558,32 +557,31 @@ export function VisualizerPage() {
                         <button
                             onClick={handleExport}
                             disabled={!selectedConversation || agents.length === 0}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors disabled:opacity-30"
+                            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-30"
                             title="Export Data"
                         >
                             <Download className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
-            </header>
+            </AppHeader>
 
             {/* Main Content */}
             <main className="flex-1 p-6 overflow-hidden">
                 {selectedConversation ? (
                     <Suspense fallback={
                         <div className="h-full flex items-center justify-center">
-                            <div className="text-gray-500 dark:text-gray-400">Loading visualizer…</div>
+                            <div className="text-gray-500">Loading visualizer…</div>
                         </div>
                     }>
                         <div className="h-[calc(100%-80px)]">
-                            <WorkflowVisualizer
-                                agents={agents}
-                                edges={edges}
-                                activeAgentId={activeAgentId}
-                                eventLog={eventLog}
-                                isDarkMode={isDarkMode}
-                                onDeleteLog={handleDeleteWorkflowLog}
-                            />
+                                <WorkflowVisualizer
+                                    agents={agents}
+                                    edges={edges}
+                                    activeAgentId={activeAgentId}
+                                    eventLog={eventLog}
+                                    onDeleteLog={handleDeleteWorkflowLog}
+                                />
                         </div>
                         <div className="mt-4 flex justify-end">
                             <button
@@ -596,23 +594,23 @@ export function VisualizerPage() {
                         </div>
                     </Suspense>
                 ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-white/50 dark:bg-gray-900/50">
+                    <div className="h-full flex flex-col items-center justify-center text-center p-8 bg-white/50">
                         <div className="relative mb-8 group">
                             <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/30 transition-all duration-500" />
-                            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border border-gray-200 dark:border-gray-700 shadow-xl flex items-center justify-center">
-                                <Radio className="w-10 h-10 text-blue-500 dark:text-blue-400" strokeWidth={1.5} />
-                                <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800">
+                            <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-white to-gray-50 border border-gray-200 shadow-xl flex items-center justify-center">
+                                <Radio className="w-10 h-10 text-blue-500" strokeWidth={1.5} />
+                                <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center shadow-lg border-2 border-white">
                                     <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                                 </div>
-                                <div className="absolute -bottom-2 -left-2 w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center shadow-lg border-2 border-white dark:border-gray-800">
+                                <div className="absolute -bottom-2 -left-2 w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center shadow-lg border-2 border-white">
                                     <RefreshCw className="w-4 h-4 text-white animate-spin-slow" />
                                 </div>
                             </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-3">
                             Visualizer Connected
                         </h2>
-                        <p className="text-gray-500 dark:text-gray-400 max-w-md leading-relaxed text-sm">
+                        <p className="text-gray-500 max-w-md leading-relaxed text-sm">
                             Select an active conversation from the top bar to inspect agent workflows, latency metrics, and real-time state transitions.
                         </p>
                     </div>

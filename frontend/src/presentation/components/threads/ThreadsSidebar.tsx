@@ -1,30 +1,29 @@
-
-import React from 'react';
-import { useNavigate, useParams } from 'react-router';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams, Link, useLocation } from 'react-router';
 import {
-    Home, Search, Heart, User,
-    Settings, X, Sparkles, ArrowLeft,
-    Clock
+    Home,
+    Clock, Plus, MessageSquare, Sparkles, Settings
 } from 'lucide-react';
+import { MAIN_NAV_ITEMS } from '../../config/appNavigation';
 import { apiClient } from '../../../infrastructure/api/apiClient';
 import type { Conversation } from '../../../domain/entities/types';
 
-export type ThreadCategory = 'all' | 'science' | 'philosophy' | 'entertainment' | 'tech';
+export type ThreadCategory = 'all' | 'requests' | 'brainstorming' | 'archived';
 
 interface ThreadsSidebarProps {
     activeCategory: ThreadCategory;
     onSelectCategory: (category: ThreadCategory) => void;
-    isMobile?: boolean; // If true, render as mobile drawer style overlay
-    isOpen?: boolean;   // For mobile state
+    isMobile?: boolean;
+    isOpen?: boolean;
     onClose?: () => void;
+    onNewRequest?: () => void;
 }
 
-const CATEGORIES: { id: ThreadCategory; label: string; icon?: string }[] = [
-    { id: 'all', label: 'For You' },
-    { id: 'science', label: 'Science' },
-    { id: 'tech', label: 'Technology' },
-    { id: 'philosophy', label: 'Philosophy' },
-    { id: 'entertainment', label: 'Entertainment' },
+const CATEGORIES: { id: ThreadCategory; label: string; icon: React.ReactNode }[] = [
+    { id: 'all', label: 'All Requests', icon: <Home size={18} /> },
+    { id: 'requests', label: 'Open Requests', icon: <MessageSquare size={18} /> },
+    { id: 'brainstorming', label: 'Brainstorming', icon: <Sparkles size={18} /> },
+    { id: 'archived', label: 'Archived', icon: <Clock size={18} /> },
 ];
 
 export const ThreadsSidebar: React.FC<ThreadsSidebarProps> = ({
@@ -32,157 +31,168 @@ export const ThreadsSidebar: React.FC<ThreadsSidebarProps> = ({
     onSelectCategory,
     isMobile = false,
     isOpen = false,
-    onClose
+    onClose,
+    onNewRequest
 }) => {
     const navigate = useNavigate();
     const { id: urlId } = useParams<{ id: string }>();
-    const [recentThreads, setRecentThreads] = React.useState<Conversation[]>([]);
+    const [recentThreads, setRecentThreads] = useState<Conversation[]>([]);
+    const location = useLocation();
 
-    React.useEffect(() => {
+    useEffect(() => {
         loadRecents();
-    }, [urlId]); // Refresh when a new thread is created
+    }, [urlId]);
 
     const loadRecents = async () => {
         try {
             const convos = await apiClient.listConversations('social_simulation');
-            setRecentThreads(convos.slice(0, 5)); // Show top 5
+            setRecentThreads(convos.slice(0, 5));
         } catch (e) {
             console.error("Failed to load recents:", e);
         }
     };
 
-    // If mobile and closed, return null (or handle animation in parent)
-    if (isMobile && !isOpen) return null;
+    const mobileClasses = isMobile
+        ? `fixed inset-y-0 left-0 z-50 w-80 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out border-r border-gray-100 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+        : "flex flex-col h-full w-full";
 
-    const ContainerClasses = isMobile
-        ? "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out border-r border-gray-100"
-        : "hidden sm:flex w-64 shrink-0 flex-col h-full border-r-2 border-gray-200 bg-white z-20";
+    // Helper for Nav Links
+    const MenuLink = ({ to, icon: Icon, label, active }: { to: string, icon: any, label: string, active: boolean }) => (
+        <Link
+            to={to}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active
+                ? "bg-white text-blue-600 shadow-sm border border-gray-100"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+        >
+            <Icon size={18} />
+            <span>{label}</span>
+        </Link>
+    );
 
     const content = (
-        <div className="flex flex-col h-full">
-            {/* Header / Logo */}
-            <div className="h-16 flex items-center justify-start px-6 gap-2">
-                <div className="text-2xl font-bold tracking-tighter hover:scale-105 transition-transform cursor-pointer">
-                    threads<span className="text-blue-600">.ai</span>
-                </div>
-                {isMobile && (
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 text-gray-500">
-                        <X size={20} />
-                    </button>
-                )}
+        <div className="flex flex-col h-full bg-slate-50/50">
+            {/* Header */}
+            <div className="p-4 bg-white border-b border-gray-100">
+                <Link to="/" className="flex items-center gap-2 px-1 mb-4">
+                    <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white">
+                        <MessageSquare size={18} fill="currentColor" />
+                    </div>
+                    <span className="font-bold text-lg tracking-tight text-gray-900">
+                        Multi-Agent<span className="text-blue-600">.ai</span>
+                    </span>
+                </Link>
+                <button
+                    onClick={onNewRequest}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 text-gray-900 rounded-xl transition-all duration-200 border border-gray-200 shadow-sm hover:shadow-md group active:scale-[0.98]"
+                >
+                    <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <Plus size={18} strokeWidth={2.5} />
+                    </div>
+                    <span className="font-semibold">New Request</span>
+                </button>
             </div>
 
-            {/* Standard Nav */}
-            <nav className="flex-1 px-3 py-6 space-y-2">
-                <NavItem
-                    icon={<Home size={26} strokeWidth={1.5} />}
-                    label="Home"
-                    active={activeCategory === 'all'}
-                    onClick={() => {
-                        onSelectCategory('all');
-                        if (isMobile && onClose) onClose();
-                    }}
-                />
-                <NavItem icon={<Search size={26} strokeWidth={1.5} />} label="Search" />
-                <NavItem icon={<Heart size={26} strokeWidth={1.5} />} label="Activity" />
-                <NavItem icon={<User size={26} strokeWidth={1.5} />} label="Profile" />
-            </nav>
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
 
-            {/* Recent Threads Section */}
-            {recentThreads.length > 0 && (
-                <div className="px-5 py-4 border-t border-gray-200">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                        <Clock size={12} /> Recent Threads
+                {/* Categories */}
+                <div>
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                        Views
                     </h3>
-                    <div className="space-y-2">
-                        {recentThreads.map(convo => (
+                    <div className="space-y-1">
+                        {CATEGORIES.map(cat => (
                             <button
-                                key={convo.id}
+                                key={cat.id}
                                 onClick={() => {
-                                    navigate(`/threads/${convo.id}`);
+                                    onSelectCategory(cat.id);
                                     if (isMobile && onClose) onClose();
                                 }}
-                                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium truncate transition-colors
-                                    ${urlId === convo.id
-                                        ? 'bg-blue-50 text-blue-700 font-bold'
-                                        : 'text-gray-500 hover:bg-gray-100'}`}
+                                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3
+                                    ${activeCategory === cat.id
+                                        ? 'bg-white text-blue-600 shadow-sm border border-gray-100'
+                                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
                             >
-                                {convo.title || convo.id.slice(0, 8)}
+                                {cat.icon}
+                                <span>{cat.label}</span>
                             </button>
                         ))}
                     </div>
                 </div>
-            )}
 
-            <div className="px-5 py-4 border-t border-gray-200">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
-                    Topics
-                </h3>
-                <div className="space-y-1">
-                    {CATEGORIES.map(cat => (
-                        <button
-                            key={cat.id}
-                            onClick={() => {
-                                onSelectCategory(cat.id);
-                                if (isMobile && onClose) onClose();
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-between
-                                ${activeCategory === cat.id
-                                    ? 'bg-black text-white'
-                                    : 'text-gray-600 hover:bg-gray-100'}`}
-                        >
-                            <span>{cat.label}</span>
-                            {activeCategory === cat.id && <Sparkles size={12} />}
-                        </button>
-                    ))}
-                </div>
+                {/* Recent Threads */}
+                {recentThreads.length > 0 && (
+                    <div>
+                        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                            Recent Activity
+                        </h3>
+                        <div className="space-y-1">
+                            {recentThreads.map(convo => (
+                                <button
+                                    key={convo.id}
+                                    onClick={() => {
+                                        navigate(`/threads/${convo.id}`);
+                                        if (isMobile && onClose) onClose();
+                                    }}
+                                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all group border border-transparent 
+                                        ${urlId === convo.id
+                                            ? 'bg-blue-50 border-blue-100 text-blue-700 shadow-sm'
+                                            : 'text-gray-600 hover:bg-white hover:border-gray-200 hover:shadow-sm'}`}
+                                >
+                                    <div className="font-medium truncate mb-0.5">
+                                        {convo.title || "Untitled Request"}
+                                    </div>
+                                    <div className="text-xs text-gray-400 truncate flex items-center gap-1">
+                                        <Clock size={10} />
+                                        <span>{convo.id.slice(0, 8)}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Footer */}
-            <div className="p-4 mt-auto border-t border-gray-200 space-y-2">
-                <button
-                    onClick={() => navigate('/')}
-                    className="flex items-center gap-3 p-2 w-full rounded-lg hover:bg-gray-100 text-gray-900 justify-start transition-colors"
-                >
-                    <ArrowLeft size={24} strokeWidth={1.5} />
-                    <span className="text-sm font-bold">Back to Workspace</span>
-                </button>
+            <div className="p-3 border-t border-gray-200 bg-gray-100/50 space-y-1">
+                {MAIN_NAV_ITEMS.map((item) => (
+                    <MenuLink
+                        key={item.path}
+                        to={item.path}
+                        icon={item.icon}
+                        label={item.label}
+                        active={item.exact ? location.pathname === item.path : location.pathname.startsWith(item.path)}
+                    />
+                ))}
 
-                <button className="flex items-center gap-3 p-2 w-full rounded-lg hover:bg-gray-50 text-gray-500 justify-start">
-                    <Settings size={24} strokeWidth={1.5} />
-                    <span className="text-sm">Settings</span>
-                </button>
+                <div className="h-px bg-gray-200 my-2 mx-2" />
+
+                <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-500 hover:text-gray-900 cursor-pointer rounded-lg hover:bg-white transition-colors">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] text-white font-bold">U</div>
+                        <span>User</span>
+                    </div>
+                    <Settings size={16} />
+                </div>
             </div>
         </div>
     );
 
-    return (
-        <>
-            {/* Mobile Backdrop */}
-            {isMobile && isOpen && (
-                <div
-                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity"
-                    onClick={onClose}
-                />
-            )}
+    if (isMobile) {
+        return (
+            <>
+                {isOpen && (
+                    <div
+                        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity"
+                        onClick={onClose}
+                    />
+                )}
+                <div className={mobileClasses}>
+                    {content}
+                </div>
+            </>
+        )
+    }
 
-            <aside className={ContainerClasses}>
-                {content}
-            </aside>
-        </>
-    );
+    return content;
 };
-
-const NavItem: React.FC<{ icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }> = ({ icon, label, active, onClick }) => (
-    <button
-        onClick={onClick}
-        className={`flex items-center gap-4 p-3 rounded-xl w-full transition-all group
-        ${active ? 'font-bold text-black' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}
-        justify-start`
-        }>
-        <div className="group-hover:scale-110 transition-transform">
-            {icon}
-        </div>
-        <span className="text-[15px]">{label}</span>
-    </button>
-);

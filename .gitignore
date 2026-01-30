@@ -85,6 +85,7 @@ docker-compose.override.yml
 # Frontend Build
 frontend/dist/
 frontend/.vite/
+frontend/.npm-cache/
 
 # Node
 node_modules/
@@ -107,6 +108,7 @@ nginx/logs/
 .agent/skills/
 .gemini/
 .antigravity*
+.codex/
 
 # Backend Data
 backend/data/

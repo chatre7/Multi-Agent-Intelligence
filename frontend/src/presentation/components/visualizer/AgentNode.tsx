@@ -1,6 +1,6 @@
 /**
  * AgentNode - Custom React Flow node for displaying agent status
- * Follows Web Interface Guidelines: focus states, dark mode, accessibility
+ * Follows Web Interface Guidelines: focus states, accessibility
  */
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
@@ -14,10 +14,10 @@ export interface AgentNodeData extends Record<string, unknown> {
 }
 
 const statusColors: Record<AgentStatus, { bg: string; ring: string; text: string }> = {
-    idle: { bg: 'bg-gray-100 dark:bg-gray-800', ring: 'ring-gray-300 dark:ring-gray-600', text: 'text-gray-600 dark:text-gray-400' },
-    active: { bg: 'bg-blue-50 dark:bg-blue-900/30', ring: 'ring-blue-500 animate-pulse', text: 'text-blue-600 dark:text-blue-400' },
-    complete: { bg: 'bg-green-50 dark:bg-green-900/30', ring: 'ring-green-500', text: 'text-green-600 dark:text-green-400' },
-    error: { bg: 'bg-red-50 dark:bg-red-900/30', ring: 'ring-red-500', text: 'text-red-600 dark:text-red-400' },
+    idle: { bg: 'bg-gray-100', ring: 'ring-gray-300', text: 'text-gray-600' },
+    active: { bg: 'bg-blue-50', ring: 'ring-blue-500 animate-pulse', text: 'text-blue-600' },
+    complete: { bg: 'bg-green-50', ring: 'ring-green-500', text: 'text-green-600' },
+    error: { bg: 'bg-red-50', ring: 'ring-red-500', text: 'text-red-600' },
 };
 
 const statusLabels: Record<AgentStatus, string> = {
@@ -49,7 +49,7 @@ function AgentNodeComponent({ data }: NodeProps) {
             <Handle
                 type="target"
                 position={Position.Left}
-                className="!w-3 !h-3 !bg-gray-400 dark:!bg-gray-500"
+                className="!w-3 !h-3 !bg-gray-400"
             />
 
             {/* Agent Info */}
@@ -70,7 +70,7 @@ function AgentNodeComponent({ data }: NodeProps) {
 
             {/* Metrics */}
             {(responseTime !== undefined || tokenCount !== undefined) && (
-                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex gap-2">
+                <div className="mt-2 text-xs text-gray-500 flex gap-2">
                     {responseTime !== undefined && (
                         <span>{responseTime}ms</span>
                     )}
@@ -84,7 +84,7 @@ function AgentNodeComponent({ data }: NodeProps) {
             <Handle
                 type="source"
                 position={Position.Right}
-                className="!w-3 !h-3 !bg-gray-400 dark:!bg-gray-500"
+                className="!w-3 !h-3 !bg-gray-400"
             />
         </div>
     );

@@ -1,11 +1,7 @@
 /** @type {import('tailwindcss').Config} */
-import typography from "@tailwindcss/typography";
 
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+module.exports = {
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -48,5 +44,6 @@ export default {
       },
     },
   },
-  plugins: [typography],
-}
+  plugins: [require("@tailwindcss/typography")],
+};
+

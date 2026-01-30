@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ThreadList } from '../components/threads/ThreadList';
 import { ThreadDetail } from '../components/threads/ThreadDetail';
@@ -11,12 +11,21 @@ import { Label } from '../components/ui/label';
 const ThreadsPage: React.FC = () => {
     const { id: urlConversationId } = useParams<{ id: string }>();
     const navigate = useNavigate();
+
+    // UI State
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newTitle, setNewTitle] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    // Derived state for view mode
-    const viewMode = urlConversationId ? 'detail' : 'list';
+    const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
+
+    useEffect(() => {
+        if (urlConversationId) {
+            setViewMode('detail');
+        } else {
+            setViewMode('list');
+        }
+    }, [urlConversationId]);
 
     const handleSelectThread = (id: string) => {
         navigate(`/threads/${id}`);
@@ -31,20 +40,14 @@ const ThreadsPage: React.FC = () => {
         setIsCreating(true);
         try {
             // For MVP, choosing a default agent (e.g., 'moderator' or 'storyteller')
-            // Ideally, we'd have a dropdown to pick initial agent or "assignee"
-            const convo = await apiClient.startConversation('social_simulation', 'moderator'); // Using moderator as default starter
+            const convo = await apiClient.startConversation('social_simulation', 'moderator');
 
             // We need to update the title immediately. 
-            // Currently startConversation doesn't take title. 
-            // We can assume first message sets title or we update it.
-            // Let's send the first message as the title/description.
             await apiClient.sendMessage({
                 domain_id: 'social_simulation',
                 message: newTitle,
                 conversation_id: convo.id
             });
-
-            // If we added a specific "Update Title" endpoint, we'd use it here.
 
             setIsCreateOpen(false);
             setNewTitle('');
@@ -56,16 +59,16 @@ const ThreadsPage: React.FC = () => {
         }
     };
 
-    if (viewMode === 'detail' && urlConversationId) {
-        return <ThreadDetail threadId={urlConversationId} onBack={handleBack} />;
-    }
-
     return (
-        <div className="h-full bg-gray-50 dark:bg-zinc-950/30 overflow-y-auto">
-            <ThreadList
-                onSelectThread={handleSelectThread}
-                onNewThread={() => setIsCreateOpen(true)}
-            />
+        <>
+            {viewMode === 'detail' && urlConversationId ? (
+                <ThreadDetail threadId={urlConversationId} onBack={handleBack} />
+            ) : (
+                <ThreadList
+                    onSelectThread={handleSelectThread}
+                    onNewThread={() => setIsCreateOpen(true)}
+                />
+            )}
 
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogContent>
@@ -95,7 +98,7 @@ const ThreadsPage: React.FC = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </>
     );
 };
 

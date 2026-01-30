@@ -7,7 +7,7 @@
 ![Backend Tests](https://img.shields.io/badge/Backend%20Tests-150%2B%20passing-green)
 ![Threads](https://img.shields.io/badge/Threads-Persistence%20%2B%20History-blueviolet)
 ![Streaming](https://img.shields.io/badge/Streaming-Real--time%20Tokens-blue)
-![Frontend](https://img.shields.io/badge/Frontend-React%2019%2BVite-blue)
+![Frontend](https://img.shields.io/badge/Frontend-React%2019%2BVite%207%2BTailwind%203-blue)
 ![Docker](https://img.shields.io/badge/Docker-Production%20Ready-blue)
 ![License](https://img.shields.io/badge/License-MIT-orange)
 
@@ -22,6 +22,7 @@
   - [Prerequisites](#prerequisites)
   - [Local Development](#local-development)
   - [Production (Docker)](#production-docker)
+- [Frontend UI Guide](#-frontend-ui-guide)
 - [Configuration Guide](#-configuration-guide)
   - [Defining Agents](#defining-agents)
   - [Domains & Strategies](#domains--strategies)
@@ -145,11 +146,49 @@ cd frontend
 npm install
 npm run dev
 ```
+Open `http://localhost:5173` and navigate to:
+- `/login` for authentication
+- `/chat` for chat
+- `/threads` for threads
+- `/visualizer` for workflow visualizer
+- `/admin` for admin panel
 
 ### Production (Docker)
 ```bash
 docker compose up -d --build
 ```
+With the production stack, Nginx serves the frontend on `http://localhost/` and routes like `http://localhost/visualizer` work as expected.
+
+---
+
+## 🧭 Frontend UI Guide
+
+The frontend has been refactored around consistent “layout routes” (React Router `Outlet`) so each page renders **content only**, while shells (sidebar/header) are centralized and shared.
+
+Key UI decisions:
+- **Tailwind CSS v3**
+- **No dark mode**: no `dark:*` utilities and no `prefers-color-scheme` CSS
+- Consistent “Threads-style” compact headers (`AppHeader`)
+- Full-height flex layouts (`flex-1` + `min-h-0`) to prevent partial-height pages
+
+Reference docs:
+- `UI_GUIDE.md` (detailed layout/routing/header/sidebar conventions)
+- `frontend/README.md` (frontend-specific setup and structure)
+
+### Current frontend routes (summary)
+Routes are defined in `frontend/src/App.tsx`:
+
+| Path | Page | Notes |
+| --- | --- | --- |
+| `/` | Home | Placeholder page under left nav shell |
+| `/chat` | Chat | Chat shell: chat history sidebar + domain/agent selector header |
+| `/threads` | Threads | Threads shell: threads sidebar (categories/recents) + compact header |
+| `/threads/:id` | Threads | Deep-link to a specific thread |
+| `/visualizer` | Visualizer | Lazy-loaded, under generic shell |
+| `/admin` | Admin | Under generic shell; includes tab row header |
+
+### Sidebar toggle alignment (UX fix)
+For pages rendered under the generic `PageLayout`, the sidebar toggle lives in the page header (not absolute positioned) so it stays aligned when collapsing/expanding.
 
 ---
 
@@ -216,8 +255,15 @@ strategy: "social_simulation" # or "orchestrator", "few_shot"
 #### Added
 - **Threads as Pull Requests**: Full workflow support with statuses and "Merge" functionality.
 - **Knowledge Base (ChromaDB)**: Automatic capture of merged threads into vector storage.
-- **UI Refinement**: Harmonized Shadcn-inspired design across Threads and Admin pages.
-- **Lazy Loading**: Route-based bundle optimization for the frontend.
+- **UI Refinement**: Harmonized layout/header/sidebar patterns across core pages.
+- **Lazy Loading**: Route-based bundle optimization for the frontend (Visualizer/Threads).
+
+### [1.7.1] - 2026-01-30
+#### Changed
+- **Frontend routing**: Chat moved to `/chat`, Home placeholder added at `/`, unknown routes redirect to `/chat`.
+- **Layout routes**: Layout shells standardized using `Outlet` (shared sidebar/header per section).
+- **Tailwind**: Standardized on Tailwind CSS v3; **dark mode removed** by policy.
+- **UI consistency**: Visualizer/Admin headers aligned to Threads-style compact headers; sidebar toggle placement fixed.
 
 ### [1.6.0] - 2026-01-29
 #### Added

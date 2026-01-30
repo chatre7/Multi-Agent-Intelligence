@@ -1,24 +1,32 @@
 # Multi-Agent Intelligence Frontend
 
-React + Vite + TailwindCSS frontend for the multi-agent system.
+React + Vite + TailwindCSS frontend for the Multi-Agent Intelligence Platform.
+
+## Key UI decisions (important)
+
+- **Tailwind CSS v3**
+- **No dark mode** by policy (no `dark:*` utilities and no `prefers-color-scheme` CSS)
+- Consistent “layout routes” using React Router `Outlet` so pages render content only and shells live in shared layouts
+
+For the detailed UI architecture guide, see `../UI_GUIDE.md`.
 
 ## Features
 
-- 🔐 JWT Authentication
-- 💬 Real-time Chat with WebSocket streaming
-- 🔀 Domain & Agent selection
-- ⚡ Streaming responses from LLMs
-- 🎯 Tool approval workflows
-- 📊 Metrics dashboard (coming soon)
-- 🛠️ Admin panel (coming soon)
+- 🔐 JWT authentication
+- 💬 Real-time chat with WebSocket streaming
+- 🔀 Domain & agent selection
+- 🧵 Threads (list + deep-link `/threads/:id`)
+- 🧭 Workflow visualizer (route: `/visualizer`, lazy-loaded)
+- 🛠️ Admin panel (route: `/admin`)
 
-## Tech Stack
+## Tech stack
 
 - **Framework**: React 19 + TypeScript
-- **Build Tool**: Vite 5
-- **Styling**: TailwindCSS 4 + shadcn/ui components
-- **State Management**: Zustand
-- **API Client**: Axios
+- **Build tool**: Vite 7
+- **Styling**: Tailwind CSS 3
+- **Routing**: `react-router` v7
+- **State management**: Zustand
+- **API client**: Axios
 - **WebSocket**: Native WebSocket + custom client
 - **Icons**: Lucide React
 
@@ -26,214 +34,89 @@ React + Vite + TailwindCSS frontend for the multi-agent system.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - Backend API running on `http://localhost:8000`
 
 ### Installation
 
 ```bash
-# Install dependencies
+cd frontend
 npm install
-
-# Setup TailwindCSS (already configured)
-# No additional setup needed!
 ```
 
 ### Development
 
 ```bash
-# Start Vite dev server
 npm run dev
-
-# Open http://localhost:5173 in browser
 ```
 
-### Build
+Open `http://localhost:5173`:
+- `/login`
+- `/`
+- `/chat`
+- `/threads`
+- `/visualizer`
+- `/admin`
+
+### Build / Preview
 
 ```bash
-# Build for production
 npm run build
-
-# Preview build
 npm run preview
 ```
 
-## Project Structure
+## Routing & layout routes
+
+Routes are defined in `src/App.tsx`.
+
+Current map:
+- `/login` (public)
+- `/` (Home placeholder, under a generic left-nav shell)
+- `/chat` (Chat section)
+- `/threads` and `/threads/:id` (Threads section)
+- `/visualizer` (Visualizer, lazy-loaded)
+- `/admin` (Admin)
+- unknown → redirected to `/chat`
+
+Layout route components live in `src/presentation/routes/` and provide consistent shells:
+- `HomeRouteLayout` → `PageLayout`
+- `ChatRouteLayout` → `ChatLayout`
+- `ThreadsRouteLayout` → `ThreadsLayout`
+- `AdminRouteLayout` → `PageLayout`
+
+## Project structure (relevant UI parts)
 
 ```
 frontend/
 ├── src/
-│   ├── domain/
-│   │   └── entities/
-│   │       └── types.ts              # Domain entities (Agent, Conversation, etc)
-│   │
+│   ├── assets/                       # Bundled images/icons (Vite fingerprints on build)
 │   ├── infrastructure/
-│   │   ├── api/
-│   │   │   └── apiClient.ts          # Axios HTTP client
-│   │   ├── stores/
-│   │   │   └── conversationStore.ts  # Zustand conversation state
-│   │   └── websocket/
-│   │       └── WebSocketClient.ts    # WebSocket client for streaming
-│   │
+│   │   ├── api/apiClient.ts          # Axios HTTP client
+│   │   ├── stores/                   # Zustand stores
+│   │   └── websocket/                # WebSocket client for streaming
 │   ├── presentation/
 │   │   ├── components/
-│   │   │   ├── chat/
-│   │   │   │   ├── ChatContainer.tsx # Main chat component
-│   │   │   │   ├── ChatMessage.tsx   # Individual message
-│   │   │   │   └── ChatInput.tsx     # Input with send button
-│   │   │   └── selectors/
-│   │   │       └── DomainSelector.tsx # Domain/Agent picker
-│   │   └── pages/
-│   │       ├── LoginPage.tsx          # Authentication
-│   │       └── ChatPage.tsx           # Main chat page
-│   │
-│   ├── lib/
-│   │   └── utils.ts                  # Utility functions (cn helper)
-│   │
-│   ├── App.tsx                       # Main app component
-│   ├── App.css                       # Global styles
-│   ├── index.css                     # TailwindCSS directives
-│   └── main.tsx                      # Entry point
-│
-├── vite.config.ts
-├── tailwind.config.js
-├── postcss.config.js
-├── tsconfig.json
+│   │   │   ├── chat/                 # Chat UI components (sidebar/header/container)
+│   │   │   ├── threads/              # Threads sidebar + thread views
+│   │   │   └── layout/               # AppHeader + layouts (ChatLayout/ThreadsLayout/PageLayout)
+│   │   ├── pages/                    # Route-level pages (Home/Chat/Threads/Admin/Visualizer/Login)
+│   │   └── routes/                   # Layout-route wrappers (Outlet-based)
+│   ├── App.tsx                       # Routing entry
+│   └── index.css                     # Tailwind directives (no dark mode)
 └── package.json
 ```
 
-## Usage
+## Images (where to put them)
 
-### Login
-
-1. Start the backend: `python -m uvicorn src.presentation.api.app:create_app --reload`
-2. Open frontend: `npm run dev`
-3. Login with demo credentials:
-   - Admin: `admin:admin`
-   - Developer: `dev:dev`
-   - User: `user:user`
-
-### Start a Conversation
-
-1. Select a Domain from the dropdown
-2. Select an Agent from the second dropdown
-3. Click "Start Conversation"
-4. Type a message and press Enter or click Send
-5. Watch responses stream in real-time!
-
-## Features in Detail
-
-### Real-time Streaming
-
-WebSocket connection automatically handles:
-- Message streaming with delta chunks
-- Message completion events
-- Tool approval requests
-- Error handling with auto-reconnection
-
-### State Management
-
-Zustand store manages:
-- Current conversation and messages
-- Streaming state
-- Loading and error states
-- Domain/Agent selections
-
-### Authentication
-
-- JWT token stored in localStorage
-- Automatic token injection in API requests
-- Login/logout functionality
-- Token persistence across sessions
-
-## API Integration
-
-The frontend communicates with backend on:
-
-- **REST API**: `http://localhost:8000/api/v1`
-- **WebSocket**: `ws://localhost:8000/ws/chat/{conversation_id}`
-
-### Available Endpoints (via apiClient)
-
-```typescript
-// Auth
-apiClient.login(username, password)
-apiClient.getMe()
-
-// Domains
-apiClient.listDomains()
-apiClient.getDomain(id)
-
-// Agents
-apiClient.listAgents(domainId?)
-apiClient.getAgent(id)
-
-// Conversations
-apiClient.startConversation(domainId, agentId)
-apiClient.getConversation(id)
-apiClient.listConversations()
-
-// Tool Runs
-apiClient.listToolRuns()
-apiClient.getToolRun(id)
-apiClient.approveToolRun(id)
-apiClient.rejectToolRun(id, reason)
-
-// Metrics
-apiClient.getMetrics()
-apiClient.getHealth()
-```
-
-## Next Steps
-
-- [ ] Admin panel for domain/agent management
-- [ ] Metrics dashboard with real-time charts
-- [ ] Tool approval modal UI
-- [ ] Conversation history sidebar
-- [ ] Export chat as markdown/PDF
-- [ ] Dark mode support
-- [ ] Mobile responsive design
-- [ ] E2E tests with Playwright
+Recommended: put UI images in `src/assets/` and import them in TSX.
+Example: `src/assets/myai.png` used in `src/presentation/pages/HomePage.tsx`.
 
 ## Troubleshooting
 
-### WebSocket Connection Fails
+### Styles don’t apply
+- Ensure Tailwind config is loaded and `src/index.css` includes Tailwind directives.
+- Run `npm run build` to confirm no Tailwind/PostCSS errors.
 
-- Ensure backend is running on `localhost:8000`
-- Check CORS configuration in backend
-- Verify token is valid
-
-### API Calls Return 401
-
-- Token may have expired
-- Try logging out and back in
-- Check localStorage for valid token
-
-### Styles Not Applying
-
-- Rebuild TailwindCSS: `npm run build`
-- Clear browser cache
-- Check tailwind.config.js content patterns
-
-## Development
-
-### Add New Components
-
-1. Create component in `src/presentation/components/`
-2. Use Tailwind classes for styling
-3. Import and use in pages
-
-### Add New API Endpoints
-
-1. Add method to `apiClient` in `src/infrastructure/api/apiClient.ts`
-2. Use in components via `apiClient.methodName()`
-3. Update TypeScript types
-
-### Add New Store Slices
-
-1. Add to Zustand store in `src/infrastructure/stores/conversationStore.ts`
-2. Use `useConversationStore()` hook in components
-
-## License
-
-MIT
+### Login redirects / route confusion
+- Chat lives at `/chat` (not `/`).
+- Unknown routes redirect to `/chat`.

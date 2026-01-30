@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Settings, BarChart3, Users, Package, RefreshCw, Database } from "lucide-react";
+import { Settings, BarChart3, Users, Package, RefreshCw, Database, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import StatCard from "../components/admin/StatCard";
 import MetricsChart from "../components/admin/MetricsChart";
 import ActivityFeed from "../components/admin/ActivityFeed";
@@ -20,6 +20,8 @@ import { KnowledgeUpload } from "../components/admin/KnowledgeUpload";
 import { KnowledgeList } from "../components/admin/KnowledgeList";
 
 import { useKnowledge } from "../hooks/useKnowledge";
+import AppHeader from "../components/layout/AppHeader";
+import { useSidebarLayout } from "../components/layout/SidebarLayoutContext";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -106,71 +108,76 @@ export default function AdminPage() {
     ]
     : [];
 
+  const sidebar = useSidebarLayout();
+  const sidebarOpen = sidebar?.sidebarOpen ?? true;
+  const setSidebarOpen = sidebar?.setSidebarOpen;
+
   return (
-    <div className="h-full bg-gray-50 overflow-y-auto">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Admin Panel</h1>
-              <p className="text-gray-600 mt-1">
-                Manage domains, agents, and system configuration
-              </p>
-            </div>
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <AppHeader>
+        <div className="flex items-center gap-3">
+          {setSidebarOpen && (
             <button
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 transition-colors flex items-center gap-2"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
             >
-              <RefreshCw
-                size={18}
-                className={isRefreshing ? "animate-spin" : ""}
-              />
-              Refresh
+              {sidebarOpen ? (
+                <PanelLeftClose size={20} />
+              ) : (
+                <PanelLeftOpen size={20} />
+              )}
             </button>
-          </div>
-
-          {lastUpdated && (
-            <p className="text-xs text-gray-500 mt-4">
-              Last updated: {lastUpdated.toLocaleTimeString()}
-            </p>
           )}
-
+          <div className="text-sm font-semibold text-gray-900">
+            Admin
+          </div>
           {error && (
-            <div className="mt-2 p-2 bg-red-100 text-red-700 text-sm rounded">
+            <div className="px-2 py-1 rounded-md bg-red-50 text-red-700 text-xs font-medium border border-red-200">
               {error}
             </div>
           )}
+          {lastUpdated && !error && (
+            <div className="text-xs text-gray-500">
+              Updated {lastUpdated.toLocaleTimeString()}
+            </div>
+          )}
         </div>
-      </div>
+        <button
+          onClick={handleManualRefresh}
+          disabled={isRefreshing}
+          className="p-2 -mr-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30"
+          title="Refresh"
+          aria-label="Refresh"
+        >
+          <RefreshCw size={20} className={isRefreshing ? "animate-spin" : ""} />
+        </button>
+      </AppHeader>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 bg-white sticky top-[120px] z-9">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-8 overflow-x-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                    }`}
-                >
-                  <Icon size={18} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      <AppHeader className="bg-white">
+        <nav className="flex items-center gap-1 overflow-x-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
+              >
+                <Icon size={18} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </nav>
+        <div />
+      </AppHeader>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <main className="flex-1 min-h-0 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-4 py-8">
         {activeTab === "overview" && (
           <div className="space-y-6">
             {/* Stat Cards */}
@@ -217,11 +224,96 @@ export default function AdminPage() {
               {/* Health Status */}
               <div className="rounded-lg border border-gray-200 bg-white p-6">
                 <p className="mb-4 text-lg font-semibold text-gray-900">
-                  System Health
+                    System Health
+                </p>
+
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          className="h-6 bg-gray-100 animate-pulse rounded"
+                        />
+                      ))}
+                    </div>
+                  ) : health ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Status</span>
+                        <span
+                          className={`text-sm font-semibold ${health.ok ? "text-green-600" : "text-red-600"}`}
+                        >
+                          {health.ok ? "✅ Healthy" : "❌ Unhealthy"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Auth Mode</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {health.auth_mode}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">
+                          Conversation Store
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {health.conversation_repo}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">
+                          Tool Run Store
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {health.tool_run_repo}
+                        </span>
+                      </div>
+                      <div className="border-t border-gray-200 pt-3 mt-3">
+                        <p className="text-sm font-semibold text-gray-900 mb-2">
+                          Configuration
+                        </p>
+                        <div className="space-y-1 text-sm">
+                          <div className="text-gray-600">
+                            Domains:{" "}
+                            <span className="font-semibold">
+                              {health.config_counts?.domains ?? 0}
+                            </span>
+                          </div>
+                          <div className="text-gray-600">
+                            Agents:{" "}
+                            <span className="font-semibold">
+                              {health.config_counts?.agents ?? 0}
+                            </span>
+                          </div>
+                          <div className="text-gray-600">
+                            Tools:{" "}
+                            <span className="font-semibold">
+                              {health.config_counts?.tools ?? 0}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="border-t border-gray-200 pt-3 mt-3">
+                        <span className="text-xs text-gray-500">
+                          Version: {health.version}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Activity Feed */}
+              <ActivityFeed isLoading={isLoading} />
+
+              {/* Metrics Summary */}
+              <div className="rounded-lg border border-gray-200 bg-white p-6">
+                <p className="mb-4 text-lg font-semibold text-gray-900">
+                  Metrics Summary
                 </p>
 
                 {isLoading ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {[1, 2, 3, 4].map((i) => (
                       <div
                         key={i}
@@ -229,190 +321,92 @@ export default function AdminPage() {
                       />
                     ))}
                   </div>
-                ) : health ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Status</span>
-                      <span
-                        className={`text-sm font-semibold ${health.ok ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {health.ok ? "✅ Healthy" : "❌ Unhealthy"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Auth Mode</span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {health.auth_mode}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">
-                        Conversation Store
-                      </span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {health.conversation_repo}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">
-                        Tool Run Store
-                      </span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {health.tool_run_repo}
-                      </span>
-                    </div>
-                    <div className="border-t border-gray-200 pt-3 mt-3">
-                      <p className="text-sm font-semibold text-gray-900 mb-2">
-                        Configuration
+                ) : metrics ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <p className="text-xs text-gray-600 mb-1">Chat Messages</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {metrics.chatMessages}
                       </p>
-                      <div className="space-y-1 text-sm">
-                        <div className="text-gray-600">
-                          Domains:{" "}
-                          <span className="font-semibold">
-                            {health.config_counts?.domains ?? 0}
-                          </span>
-                        </div>
-                        <div className="text-gray-600">
-                          Agents:{" "}
-                          <span className="font-semibold">
-                            {health.config_counts?.agents ?? 0}
-                          </span>
-                        </div>
-                        <div className="text-gray-600">
-                          Tools:{" "}
-                          <span className="font-semibold">
-                            {health.config_counts?.tools ?? 0}
-                          </span>
-                        </div>
-                      </div>
                     </div>
-                    <div className="border-t border-gray-200 pt-3 mt-3">
-                      <span className="text-xs text-gray-500">
-                        Version: {health.version}
-                      </span>
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <p className="text-xs text-gray-600 mb-1">
+                        Tool Runs Requested
+                      </p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {metrics.toolRunsRequested}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <p className="text-xs text-gray-600 mb-1">Approved</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {metrics.toolRunsApproved}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-red-50 rounded-lg">
+                      <p className="text-xs text-gray-600 mb-1">Rejected</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        {metrics.toolRunsRejected}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-purple-50 rounded-lg">
+                      <p className="text-xs text-gray-600 mb-1">Executed</p>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {metrics.toolRunsExecuted}
+                      </p>
                     </div>
                   </div>
                 ) : null}
               </div>
             </div>
+          )}
 
-            {/* Activity Feed */}
-            <ActivityFeed isLoading={isLoading} />
-
-            {/* Metrics Summary */}
-            <div className="rounded-lg border border-gray-200 bg-white p-6">
-              <p className="mb-4 text-lg font-semibold text-gray-900">
-                Metrics Summary
-              </p>
-
-              {isLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="h-6 bg-gray-100 animate-pulse rounded"
-                    />
-                  ))}
-                </div>
-              ) : metrics ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Chat Messages</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {metrics.chatMessages}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">
-                      Tool Runs Requested
-                    </p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {metrics.toolRunsRequested}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Approved</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {metrics.toolRunsApproved}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-red-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Rejected</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {metrics.toolRunsRejected}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-purple-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Executed</p>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {metrics.toolRunsExecuted}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
+          {activeTab === "domains" && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4">Domain Management</h2>
+                <DomainList
+                  onSelect={setSelectedDomain}
+                  selectedDomainId={selectedDomain?.id}
+                />
+              </div>
+              {selectedDomain && (
+                <DomainDetail
+                  domain={selectedDomain}
+                  onClose={() => setSelectedDomain(null)}
+                />
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === "domains" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Domain Management</h2>
-              <DomainList
-                onSelect={setSelectedDomain}
-                selectedDomainId={selectedDomain?.id}
-              />
+          {activeTab === "agents" && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4">Agent Management</h2>
+                <AgentList
+                  onSelect={setSelectedAgent}
+                  selectedAgentId={selectedAgent?.id}
+                />
+              </div>
+              {selectedAgent && (
+                <AgentDetail
+                  agent={selectedAgent}
+                  onClose={() => setSelectedAgent(null)}
+                  onPromote={async (agentId, newState) => {
+                    await apiClient.promoteAgent(agentId, newState);
+                    setSelectedAgent(null);
+                  }}
+                />
+              )}
             </div>
-            {selectedDomain && (
-              <DomainDetail
-                domain={selectedDomain}
-                onClose={() => setSelectedDomain(null)}
-              />
-            )}
-          </div>
-        )}
+          )}
 
-        {activeTab === "agents" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Agent Management</h2>
-              <AgentList
-                onSelect={setSelectedAgent}
-                selectedAgentId={selectedAgent?.id}
-              />
-            </div>
-            {selectedAgent && (
-              <AgentDetail
-                agent={selectedAgent}
-                onClose={() => setSelectedAgent(null)}
-                onPromote={async (agentId, newState) => {
-                  await apiClient.promoteAgent(agentId, newState);
-                  setSelectedAgent(null);
-                }}
-              />
-            )}
-          </div>
-        )}
-
-        {activeTab === "tools" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Tool Approval Queue</h2>
-            <ToolRunList
-              onSelect={setSelectedToolRun}
-              selectedToolRunId={selectedToolRun?.id}
-              onApprove={async (runId) => {
-                await apiClient.approveToolRun(runId);
-                setSelectedToolRun(null);
-              }}
-              onReject={async (runId, reason) => {
-                await apiClient.rejectToolRun(runId, reason);
-                setSelectedToolRun(null);
-              }}
-            />
-            {selectedToolRun && (
-              <ToolApprovalModal
-                toolRun={selectedToolRun}
-                onClose={() => setSelectedToolRun(null)}
+          {activeTab === "tools" && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-4">Tool Approval Queue</h2>
+              <ToolRunList
+                onSelect={setSelectedToolRun}
+                selectedToolRunId={selectedToolRun?.id}
                 onApprove={async (runId) => {
                   await apiClient.approveToolRun(runId);
                   setSelectedToolRun(null);
@@ -422,41 +416,55 @@ export default function AdminPage() {
                   setSelectedToolRun(null);
                 }}
               />
-            )}
-          </div>
-        )}
-
-        {activeTab === "knowledge" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow p-6 mb-6">
-                <h2 className="text-lg font-semibold mb-4">Upload Documents</h2>
-                <KnowledgeUpload onUploadComplete={fetchDocuments} />
-              </div>
-            </div>
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold">Knowledge Base</h2>
-                  <button onClick={fetchDocuments} className="text-sm text-blue-600 hover:underline">Refresh</button>
-                </div>
-                <KnowledgeList
-                  documents={documents}
-                  onDelete={deleteDocument}
-                  isLoading={isDocsLoading}
+              {selectedToolRun && (
+                <ToolApprovalModal
+                  toolRun={selectedToolRun}
+                  onClose={() => setSelectedToolRun(null)}
+                  onApprove={async (runId) => {
+                    await apiClient.approveToolRun(runId);
+                    setSelectedToolRun(null);
+                  }}
+                  onReject={async (runId, reason) => {
+                    await apiClient.rejectToolRun(runId, reason);
+                    setSelectedToolRun(null);
+                  }}
                 />
+              )}
+            </div>
+          )}
+
+          {activeTab === "knowledge" && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <div className="bg-white rounded-lg shadow p-6 mb-6">
+                  <h2 className="text-lg font-semibold mb-4">Upload Documents</h2>
+                  <KnowledgeUpload onUploadComplete={fetchDocuments} />
+                </div>
+              </div>
+              <div className="lg:col-span-2">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold">Knowledge Base</h2>
+                    <button onClick={fetchDocuments} className="text-sm text-blue-600 hover:underline">Refresh</button>
+                  </div>
+                  <KnowledgeList
+                    documents={documents}
+                    onDelete={deleteDocument}
+                    isLoading={isDocsLoading}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {activeTab === "settings" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">System Settings</h2>
-            <p className="text-gray-600">Settings management coming soon...</p>
-          </div>
-        )}
-      </div>
+          {activeTab === "settings" && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-4">System Settings</h2>
+              <p className="text-gray-600">Settings management coming soon...</p>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

@@ -38,7 +38,6 @@ interface WorkflowVisualizerProps {
     edges: WorkflowEdgeData[];
     activeAgentId: string | null;
     eventLog: WorkflowEvent[];
-    isDarkMode?: boolean;
     onDeleteLog?: (logId: string) => void;
 }
 
@@ -77,7 +76,6 @@ function WorkflowVisualizerComponent({
     edges: domainEdges,
     activeAgentId,
     eventLog,
-    isDarkMode = false,
     onDeleteLog,
 }: WorkflowVisualizerProps) {
     // Convert domain models to React Flow format
@@ -105,8 +103,8 @@ function WorkflowVisualizerComponent({
         <div className="flex h-full w-full gap-4">
             {/* Main Canvas */}
             <div
-                className="flex-1 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 overflow-hidden shadow-inner relative"
-                style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                className="flex-1 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden shadow-inner relative"
+                style={{ colorScheme: 'light' }}
             >
                 <ReactFlow
                     nodes={nodes}
@@ -122,54 +120,54 @@ function WorkflowVisualizerComponent({
                 >
                     <Controls
                         showInteractive={false}
-                        className="!bg-white dark:!bg-gray-900 !border-gray-200 dark:!border-gray-800 !shadow-sm !rounded-lg overflow-hidden [&>button]:!border-b-gray-100 dark:[&>button]:!border-b-gray-800 [&>button]:!text-gray-600 dark:[&>button]:!text-gray-400 [&>button:hover]:!bg-gray-50 dark:[&>button:hover]:!bg-gray-800"
+                        className="!bg-white !border-gray-200 !shadow-sm !rounded-lg overflow-hidden [&>button]:!border-b-gray-100 [&>button]:!text-gray-600 [&>button:hover]:!bg-gray-50"
                     />
                     <MiniMap
-                        className="!bg-white dark:!bg-gray-900 !border-gray-200 dark:!border-gray-800 !shadow-sm !rounded-lg overflow-hidden bottom-4 right-4"
+                        className="!bg-white !border-gray-200 !shadow-sm !rounded-lg overflow-hidden bottom-4 right-4"
                         nodeColor={(node) => {
                             const data = node.data as AgentNodeData | undefined;
                             if (data?.status === 'active') return '#3b82f6';
                             if (data?.status === 'complete') return '#22c55e';
                             if (data?.status === 'error') return '#ef4444';
-                            return isDarkMode ? '#374151' : '#e5e7eb';
+                            return '#e5e7eb';
                         }}
-                        maskColor={isDarkMode ? 'rgba(17, 24, 39, 0.7)' : 'rgba(243, 244, 246, 0.7)'}
+                        maskColor={'rgba(243, 244, 246, 0.7)'}
                     />
                     <Background
                         variant={BackgroundVariant.Dots}
                         gap={24}
                         size={1.5}
-                        color={isDarkMode ? '#374151' : '#d1d5db'}
+                        color={'#d1d5db'}
                     />
                 </ReactFlow>
             </div>
 
             {/* Event Log Sidebar */}
-            <div className="w-[450px] flex flex-col bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                    <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <div className="w-[450px] flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-2">
                         Event Log
-                        <span className="text-xs font-normal text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+                        <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
                             {eventLog.length}
                         </span>
                     </h3>
                 </div>
 
                 <div
-                    className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-800 scrollbar-track-transparent"
+                    className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent"
                     role="log"
                     aria-live="polite"
                 >
                     {eventLog.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-center px-6 py-8">
-                            <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mb-4 ring-8 ring-blue-50/50 dark:ring-blue-900/10">
+                            <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-4 ring-8 ring-blue-50/50">
                                 <span className="text-2xl animate-pulse">📋</span>
                             </div>
-                            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">Event Log Empty</h4>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-[200px]">Waiting for agents to start processing tasks...</p>
+                            <h4 className="text-sm font-semibold text-gray-900 mb-1">Event Log Empty</h4>
+                            <p className="text-xs text-gray-500 mt-1 max-w-[200px]">Waiting for agents to start processing tasks...</p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-gray-100 dark:divide-gray-800/50">
+                        <div className="divide-y divide-gray-100">
                             {eventLog.map((event, index) => {
                                 const timeStr = event.timestamp
                                     ? new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -181,36 +179,36 @@ function WorkflowVisualizerComponent({
                                 const isHandoff = event.type === 'handoff';
 
                                 return (
-                                    <div
-                                        key={`${event.timestamp}-${index}`}
-                                        className="relative group p-4 hover:bg-gray-50/80 dark:hover:bg-gray-800/50 transition-all font-mono text-xs"
-                                    >
-                                        <div className="flex items-start gap-3">
+                                     <div
+                                         key={`${event.timestamp}-${index}`}
+                                        className="relative group p-4 hover:bg-gray-50/80 transition-all font-mono text-xs"
+                                     >
+                                         <div className="flex items-start gap-3">
                                             {/* Status Dot */}
                                             <div className="mt-1.5 flex-shrink-0 relative">
-                                                <div className={`w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-gray-900 ${isStart ? 'bg-blue-500' :
+                                                <div className={`w-2.5 h-2.5 rounded-full ring-2 ring-white ${isStart ? 'bg-blue-500' :
                                                     isEnd ? 'bg-green-500' :
                                                         isThought ? 'bg-purple-400' :
                                                             'bg-amber-400'
                                                     }`} />
                                                 {index !== eventLog.length - 1 && (
-                                                    <div className="absolute top-3 left-1.5 w-px h-[calc(100%+1rem)] bg-gray-100 dark:bg-gray-800 -z-10" />
+                                                    <div className="absolute top-3 left-1.5 w-px h-[calc(100%+1rem)] bg-gray-100 -z-10" />
                                                 )}
                                             </div>
 
                                             <div className="flex-1 min-w-0 space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-gray-400 dark:text-gray-500 select-none">
+                                                    <span className="text-gray-400 select-none">
                                                         {timeStr}
                                                     </span>
-                                                    <span className={`font-semibold  ${isStart ? 'text-blue-700 dark:text-blue-400' :
-                                                        isEnd ? 'text-green-700 dark:text-green-400' :
-                                                            isThought ? 'text-purple-700 dark:text-purple-400' :
-                                                                'text-amber-700 dark:text-amber-400'
+                                                    <span className={`font-semibold  ${isStart ? 'text-blue-700' :
+                                                        isEnd ? 'text-green-700' :
+                                                            isThought ? 'text-purple-700' :
+                                                                'text-amber-700'
                                                         }`}>
                                                         {event.agentName}
                                                         {typeof event.metadata?.skill_id === 'string' && (
-                                                            <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                                            <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-700 border border-amber-200">
                                                                 <Zap size={10} className="fill-amber-500 text-amber-600" />
                                                                 {String(event.metadata?.skill_id)}
                                                             </span>
@@ -218,19 +216,19 @@ function WorkflowVisualizerComponent({
                                                     </span>
                                                 </div>
 
-                                                <div className="text-gray-600 dark:text-gray-300 break-words leading-relaxed">
+                                                <div className="text-gray-600 break-words leading-relaxed">
                                                     {isStart && (typeof event.content === 'string' ? event.content : JSON.stringify(event.content) || 'Started processing')}
                                                     {isEnd && (typeof event.content === 'string' ? event.content : JSON.stringify(event.content) || 'Completed task')}
                                                     {isHandoff && (
-                                                        <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
+                                                        <span className="flex items-center gap-1.5 text-amber-600">
                                                             <span>Handed off to</span>
-                                                            <strong className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/30 rounded">
+                                                            <strong className="px-1.5 py-0.5 bg-amber-50 rounded">
                                                                 {typeof event.metadata?.toAgent === 'string' ? String(event.metadata?.toAgent) : "Next Agent"}
                                                             </strong>
                                                         </span>
                                                     )}
                                                     {isThought && (
-                                                        <div className="mt-1 pl-3 border-l-2 border-purple-100 dark:border-purple-900/50 italic opacity-90">
+                                                        <div className="mt-1 pl-3 border-l-2 border-purple-100 italic opacity-90">
                                                             {typeof event.content === 'string' ? event.content :
                                                                 typeof event.metadata?.reason === 'string' ? String(event.metadata?.reason) :
                                                                     typeof event.metadata?.thought === 'string' ? String(event.metadata?.thought) :
@@ -245,7 +243,7 @@ function WorkflowVisualizerComponent({
                                                 {event.id && (
                                                     <button
                                                         onClick={() => onDeleteLog?.(event.id!)}
-                                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                                                         title="Delete log entry"
                                                         aria-label="Delete log entry"
                                                     >

@@ -198,27 +198,47 @@ export default function ChatContainer({
     return null;
   }
 
+  if (!store.currentConversation) {
+    return null;
+  }
+
+  const isEmpty = store.currentConversation.messages.length === 0 && store.pendingApprovals.length === 0;
+
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Messages - Fixed height with scroll */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {store.currentConversation.messages.length === 0 && store.pendingApprovals.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center px-4">
-              <p className="text-gray-400 text-sm">Start a conversation…</p>
+    <div className="h-full flex flex-col relative">
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-gray-200">
+        {isEmpty ? (
+          <div className="h-full flex flex-col items-center justify-center p-4">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-2">How can I help you today?</h2>
+            <p className="text-gray-500 mb-8">Select a capability to get started</p>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-[90%] w-full">
+              {[
+                { label: "Analyze Code", desc: "Review project structure", prompt: "Can you analyze the current project structure?" },
+                { label: "Find Bugs", desc: "Debug current file", prompt: "I need help debugging the currently open file." },
+                { label: "Plan Feature", desc: "Create implementation plan", prompt: "Draft a plan for a new feature." },
+                { label: "Explain Concepts", desc: "Understand architecture", prompt: "Explain the architecture of this system." }
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={() => handleSendMessage(chip.prompt)}
+                  className="p-4 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all text-left group"
+                >
+                  <div className="font-medium text-gray-700 group-hover:text-blue-600 mb-1">{chip.label}</div>
+                  <div className="text-xs text-gray-400">{chip.desc}</div>
+                </button>
+              ))}
             </div>
           </div>
         ) : (
-          <>
+          <div className="pb-32"> {/* Padding for input area */}
             {store.currentConversation.messages.map((message, index) => {
               const messages = store.currentConversation!.messages;
               const isLast = index === messages.length - 1;
 
-              // Smart isStreaming logic: 
-              // True if it's the last message AND we're streaming,
-              // OR if it's the last ASSISTANT message AND we're streaming (handles handoff system markers)
+              // Smart isStreaming logic
               let isMsgStreaming = store.isStreaming && isLast;
-
               if (store.isStreaming && message.role === 'assistant') {
                 let lastAssistantIndex = -1;
                 for (let i = messages.length - 1; i >= 0; i--) {
@@ -239,6 +259,7 @@ export default function ChatContainer({
                 />
               );
             })}
+
             {store.pendingApprovals.map((req) => (
               <ToolApprovalCard
                 key={req.requestId}
@@ -248,34 +269,36 @@ export default function ChatContainer({
               />
             ))}
             <div ref={messagesEndRef} className="h-4" />
-          </>
+          </div>
         )}
       </div>
 
-      {/* Error Banner */}
-      {store.error && (
-        <div className="mx-4 mb-3 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl flex items-center justify-between shadow-sm">
-          <span>{store.error}</span>
-          <button
-            onClick={() => store.clearError()}
-            className="ml-4 font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-2 rounded px-2 py-1"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+      {/* Input Area (Fixed/Floating at bottom) */}
+      <div className="absolute bottom-0 left-0 w-full p-4 pointer-events-none">
+        {/* Error Banner */}
+        {store.error && (
+          <div className="max-w-3xl mx-auto mb-2 px-4 py-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-center justify-between shadow-sm pointer-events-auto">
+            <span>{store.error}</span>
+            <button
+              onClick={() => store.clearError()}
+              className="ml-4 font-semibold hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
-      {/* Input - Fixed at bottom */}
-      <div className="border-t border-gray-200 bg-white p-4">
-        <ChatInput
-          onSendMessage={handleSendMessage}
-          disabled={
-            !wsRef.current?.isConnected() || isConnecting || store.isStreaming
-          }
-          isLoading={isConnecting}
-          thinkingEnabled={thinkingEnabled}
-          onThinkingChange={setThinkingEnabled}
-        />
+        <div className="pointer-events-auto">
+          <ChatInput
+            onSendMessage={handleSendMessage}
+            disabled={
+              !wsRef.current?.isConnected() || isConnecting || store.isStreaming
+            }
+            isLoading={isConnecting}
+            thinkingEnabled={thinkingEnabled}
+            onThinkingChange={setThinkingEnabled}
+          />
+        </div>
       </div>
     </div>
   );

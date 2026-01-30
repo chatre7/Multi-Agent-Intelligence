@@ -29,6 +29,7 @@ interface ConversationStore {
   removePendingApproval: (requestId: string) => void;
   addHandoffMarker: (fromAgent: string, toAgent: string) => void;
   clearError: () => void;
+  deleteConversation: (id: string) => Promise<void>;
 }
 
 export const useConversationStore = create<ConversationStore>((set) => ({
@@ -213,4 +214,14 @@ export const useConversationStore = create<ConversationStore>((set) => ({
     }),
 
   clearError: () => set({ error: null }),
+
+  deleteConversation: async (id: string) => {
+    // Optimistic update
+    set((state) => ({
+      conversations: state.conversations.filter((c) => c.id !== id),
+      currentConversation: state.currentConversation?.id === id ? null : state.currentConversation
+    }));
+    // TODO: Call API when endpoint is available
+    // try { await apiClient.deleteConversation(id); } catch (e) { ... }
+  }
 }));

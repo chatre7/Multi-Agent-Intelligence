@@ -41,56 +41,68 @@ export default function ChatInput({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="max-w-[95%] mx-auto w-full">
       {/* Thinking Mode Indicator */}
       {thinkingEnabled && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700 animate-in fade-in slide-in-from-bottom-1 duration-200">
+        <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700 animate-in fade-in slide-in-from-bottom-1 duration-200 w-fit mx-auto">
           <BrainCircuit size={14} className="text-purple-500" />
-          <span className="font-medium">Thinking Mode ON</span>
-          <span className="opacity-70">– AI will show reasoning process</span>
+          <span className="font-medium">Thinking Mode</span>
         </div>
       )}
 
-      <div className="flex gap-2 items-end">
+      <div className="relative bg-gray-50 rounded-2xl border border-gray-200 shadow-sm focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-400 focus-within:bg-white transition-all duration-200">
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type your message... (Shift+Enter for new line)"
+          onKeyDown={handleKeyPress}
+          placeholder="How can I help you today?"
           disabled={disabled || isLoading}
-          className="flex-1 p-3 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-400 disabled:bg-gray-100 disabled:text-gray-500 transition-all duration-200 text-sm"
-          rows={3}
+          className="w-full max-h-[200px] py-3.5 pl-4 pr-12 bg-transparent resize-none focus:outline-none text-sm leading-relaxed scrollbar-thin scrollbar-thumb-gray-200"
+          rows={1}
+          style={{ minHeight: '52px' }}
+          onInput={(e) => {
+            const target = e.target as HTMLTextAreaElement;
+            target.style.height = 'auto'; // Reset height
+            target.style.height = `${Math.min(target.scrollHeight, 200)}px`; // Grow up to 200px
+          }}
         />
 
-        <div className="flex flex-col gap-2">
-          {/* Thinking Toggle Button */}
+        {/* Actions Area */}
+        <div className="absolute bottom-2 right-2 flex items-center gap-1">
+          {/* Thinking Toggle */}
           <button
             onClick={toggleThinking}
             type="button"
-            title={thinkingEnabled ? "Disable thinking mode" : "Enable thinking mode"}
-            aria-pressed={thinkingEnabled}
-            aria-label="Toggle thinking mode"
-            className={`p-2.5 rounded-xl border transition-all duration-200 ${thinkingEnabled
-                ? "bg-purple-100 border-purple-300 text-purple-600 shadow-sm shadow-purple-200/50"
-                : "bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-600 hover:border-gray-300"
-              }`}
+            className={`p-1.5 rounded-lg transition-colors ${thinkingEnabled
+              ? "bg-purple-100 text-purple-600"
+              : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"}`}
+            title="Enable Thinking"
           >
-            <BrainCircuit size={20} className={thinkingEnabled ? "animate-pulse" : ""} />
+            <BrainCircuit size={18} />
           </button>
 
           {/* Send Button */}
           <button
             onClick={handleSend}
             disabled={disabled || isLoading || !message.trim()}
-            className="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all duration-200 shadow-sm shadow-blue-500/20 disabled:shadow-none"
+            className={`p-1.5 rounded-lg transition-all duration-200 ${!message.trim() || disabled
+              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+              : "bg-black text-white hover:bg-gray-800 shadow-md"
+              }`}
           >
             {isLoading ? (
-              <span className="animate-spin block w-5 h-5 border-2 border-white/30 border-t-white rounded-full"></span>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin m-0.5"></div>
             ) : (
-              <Send size={20} />
+              <Send size={18} />
             )}
           </button>
         </div>
+      </div>
+
+      <div className="text-center mt-2">
+        <p className="text-[10px] text-gray-400">
+          Multi-Agent AI can make mistakes. Check important info.
+        </p>
       </div>
     </div>
   );
